@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,34 +18,40 @@ package org.springframework.web.servlet.view;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.ApplicationContextException;
-import org.springframework.mock.web.test.MockHttpServletRequest;
-import org.springframework.mock.web.test.MockHttpServletResponse;
-import org.springframework.mock.web.test.MockServletContext;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.View;
+import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
+import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
+import org.springframework.web.testfixture.servlet.MockServletContext;
 
-import static org.mockito.BDDMockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 /**
- * Tests for AbstractView. Not called AbstractViewTests as
- * would otherwise be excluded by Ant build script wildcard.
+ * Base tests for {@link AbstractView}.
+ *
+ * <p>Not called {@code AbstractViewTests} since doing so would cause it
+ * to be ignored in the Gradle build.
  *
  * @author Rod Johnson
+ * @author Sam Brannen
  */
-public class BaseViewTests extends TestCase {
+public class BaseViewTests {
 
-	public void testRenderWithoutStaticAttributes() throws Exception {
+	@Test
+	public void renderWithoutStaticAttributes() throws Exception {
 		WebApplicationContext wac = mock(WebApplicationContext.class);
 		given(wac.getServletContext()).willReturn(new MockServletContext());
 
@@ -57,21 +63,21 @@ public class BaseViewTests extends TestCase {
 		tv.setApplicationContext(wac);
 		tv.setApplicationContext(wac);
 
-		Map<String, Object> model = new HashMap<String, Object>();
+		Map<String, Object> model = new HashMap<>();
 		model.put("foo", "bar");
 		model.put("something", new Object());
 		tv.render(model, request, response);
 
-		// check it contains all
 		checkContainsAll(model, tv.model);
 
-		assertTrue(tv.inited);
+		assertThat(tv.initialized).isTrue();
 	}
 
 	/**
 	 * Test attribute passing, NOT CSV parsing.
 	 */
-	public void testRenderWithStaticAttributesNoCollision() throws Exception {
+	@Test
+	public void renderWithStaticAttributesNoCollision() throws Exception {
 		WebApplicationContext wac = mock(WebApplicationContext.class);
 		given(wac.getServletContext()).willReturn(new MockServletContext());
 
@@ -85,19 +91,19 @@ public class BaseViewTests extends TestCase {
 		p.setProperty("something", "else");
 		tv.setAttributes(p);
 
-		Map<String, Object> model = new HashMap<String, Object>();
-		model.put("one", new HashMap<Object, Object>());
+		Map<String, Object> model = new HashMap<>();
+		model.put("one", new HashMap<>());
 		model.put("two", new Object());
 		tv.render(model, request, response);
 
-		// Check it contains all
 		checkContainsAll(model, tv.model);
 		checkContainsAll(p, tv.model);
 
-		assertTrue(tv.inited);
+		assertThat(tv.initialized).isTrue();
 	}
 
-	public void testPathVarsOverrideStaticAttributes() throws Exception {
+	@Test
+	public void pathVarsOverrideStaticAttributes() throws Exception {
 		WebApplicationContext wac = mock(WebApplicationContext.class);
 		given(wac.getServletContext()).willReturn(new MockServletContext());
 
@@ -112,23 +118,22 @@ public class BaseViewTests extends TestCase {
 		p.setProperty("something", "else");
 		tv.setAttributes(p);
 
-		Map<String, Object> pathVars = new HashMap<String, Object>();
-		pathVars.put("one", new HashMap<Object, Object>());
+		Map<String, Object> pathVars = new HashMap<>();
+		pathVars.put("one", new HashMap<>());
 		pathVars.put("two", new Object());
 		request.setAttribute(View.PATH_VARIABLES, pathVars);
 
-		tv.render(new HashMap<String, Object>(), request, response);
+		tv.render(new HashMap<>(), request, response);
 
-		// Check it contains all
 		checkContainsAll(pathVars, tv.model);
-		assertTrue(tv.model.size() == 3);
-		// will have old something from properties
-		assertTrue(tv.model.get("something").equals("else"));
 
-		assertTrue(tv.inited);
+		assertThat(tv.model.size()).isEqualTo(3);
+		assertThat(tv.model.get("something")).isEqualTo("else");
+		assertThat(tv.initialized).isTrue();
 	}
 
-	public void testDynamicModelOverridesStaticAttributesIfCollision() throws Exception {
+	@Test
+	public void dynamicModelOverridesStaticAttributesIfCollision() throws Exception {
 		WebApplicationContext wac = mock(WebApplicationContext.class);
 		given(wac.getServletContext()).willReturn(new MockServletContext());
 
@@ -142,21 +147,21 @@ public class BaseViewTests extends TestCase {
 		p.setProperty("something", "else");
 		tv.setAttributes(p);
 
-		Map<String, Object> model = new HashMap<String, Object>();
-		model.put("one", new HashMap<Object, Object>());
+		Map<String, Object> model = new HashMap<>();
+		model.put("one", new HashMap<>());
 		model.put("two", new Object());
 		tv.render(model, request, response);
 
 		// Check it contains all
 		checkContainsAll(model, tv.model);
-		assertTrue(tv.model.size() == 3);
-		// will have old something from properties
-		assertTrue(tv.model.get("something").equals("else"));
 
-		assertTrue(tv.inited);
+		assertThat(tv.model.size()).isEqualTo(3);
+		assertThat(tv.model.get("something")).isEqualTo("else");
+		assertThat(tv.initialized).isTrue();
 	}
 
-	public void testDynamicModelOverridesPathVariables() throws Exception {
+	@Test
+	public void dynamicModelOverridesPathVariables() throws Exception {
 		WebApplicationContext wac = mock(WebApplicationContext.class);
 		given(wac.getServletContext()).willReturn(new MockServletContext());
 
@@ -166,169 +171,157 @@ public class BaseViewTests extends TestCase {
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
-		Map<String, Object> pathVars = new HashMap<String, Object>();
+		Map<String, Object> pathVars = new HashMap<>();
 		pathVars.put("one", "bar");
 		pathVars.put("something", "else");
 		request.setAttribute(View.PATH_VARIABLES, pathVars);
 
-		Map<String, Object> model = new HashMap<String, Object>();
-		model.put("one", new HashMap<Object, Object>());
+		Map<String, Object> model = new HashMap<>();
+		model.put("one", new HashMap<>());
 		model.put("two", new Object());
 
 		tv.render(model, request, response);
 
-		// Check it contains all
 		checkContainsAll(model, tv.model);
-		assertEquals(3, tv.model.size());
-		// will have old something from path variables
-		assertTrue(tv.model.get("something").equals("else"));
-
-		assertTrue(tv.inited);
+		assertThat(tv.model.size()).isEqualTo(3);
+		assertThat(tv.model.get("something")).isEqualTo("else");
+		assertThat(tv.initialized).isTrue();
 	}
 
-	public void testIgnoresNullAttributes() {
+	@Test
+	public void ignoresNullAttributes() {
 		AbstractView v = new ConcreteView();
 		v.setAttributes(null);
-		assertTrue(v.getStaticAttributes().size() == 0);
+		assertThat(v.getStaticAttributes().size()).isEqualTo(0);
 	}
 
 	/**
 	 * Test only the CSV parsing implementation.
 	 */
-	public void testAttributeCSVParsingIgnoresNull() {
+	@Test
+	public void attributeCSVParsingIgnoresNull() {
 		AbstractView v = new ConcreteView();
 		v.setAttributesCSV(null);
-		assertTrue(v.getStaticAttributes().size() == 0);
+		assertThat(v.getStaticAttributes().size()).isEqualTo(0);
 	}
 
-	public void testAttributeCSVParsingIgnoresEmptyString() {
+	@Test
+	public void attributeCSVParsingIgnoresEmptyString() {
 		AbstractView v = new ConcreteView();
 		v.setAttributesCSV("");
-		assertTrue(v.getStaticAttributes().size() == 0);
+		assertThat(v.getStaticAttributes().size()).isEqualTo(0);
 	}
 
 	/**
 	 * Format is attname0={value1},attname1={value1}
 	 */
-	public void testAttributeCSVParsingValid() {
+	@Test
+	public void attributeCSVParsingValid() {
 		AbstractView v = new ConcreteView();
 		v.setAttributesCSV("foo=[bar],king=[kong]");
-		assertTrue(v.getStaticAttributes().size() == 2);
-		assertTrue(v.getStaticAttributes().get("foo").equals("bar"));
-		assertTrue(v.getStaticAttributes().get("king").equals("kong"));
+		assertThat(v.getStaticAttributes().size() == 2).isTrue();
+		assertThat(v.getStaticAttributes().get("foo").equals("bar")).isTrue();
+		assertThat(v.getStaticAttributes().get("king").equals("kong")).isTrue();
 	}
 
-	public void testAttributeCSVParsingValidWithWeirdCharacters() {
+	@Test
+	public void attributeCSVParsingValidWithWeirdCharacters() {
 		AbstractView v = new ConcreteView();
 		String fooval = "owfie   fue&3[][[[2 \n\n \r  \t 8\ufffd3";
 		// Also tests empty value
 		String kingval = "";
 		v.setAttributesCSV("foo=(" + fooval + "),king={" + kingval + "},f1=[we]");
-		assertTrue(v.getStaticAttributes().size() == 3);
-		assertTrue(v.getStaticAttributes().get("foo").equals(fooval));
-		assertTrue(v.getStaticAttributes().get("king").equals(kingval));
+		assertThat(v.getStaticAttributes().size() == 3).isTrue();
+		assertThat(v.getStaticAttributes().get("foo").equals(fooval)).isTrue();
+		assertThat(v.getStaticAttributes().get("king").equals(kingval)).isTrue();
 	}
 
-	public void testAttributeCSVParsingInvalid() {
+	@Test
+	public void attributeCSVParsingInvalid() {
 		AbstractView v = new ConcreteView();
-		try {
-			// No equals
-			v.setAttributesCSV("fweoiruiu");
-			fail();
-		}
-		catch (IllegalArgumentException ex) {
-		}
+		// No equals
+		assertThatIllegalArgumentException().isThrownBy(() ->
+			v.setAttributesCSV("fweoiruiu"));
 
-		try {
-			// No value
-			v.setAttributesCSV("fweoiruiu=");
-			fail();
-		}
-		catch (IllegalArgumentException ex) {
-		}
+		// No value
+		assertThatIllegalArgumentException().isThrownBy(() ->
+				v.setAttributesCSV("fweoiruiu="));
 
-		try {
-			// No closing ]
-			v.setAttributesCSV("fweoiruiu=[");
-			fail();
-		}
-		catch (IllegalArgumentException ex) {
-		}
-		try {
-			// Second one is bogus
-			v.setAttributesCSV("fweoiruiu=[de],=");
-			fail();
-		}
-		catch (IllegalArgumentException ex) {
-		}
+		// No closing ]
+		assertThatIllegalArgumentException().isThrownBy(() ->
+				v.setAttributesCSV("fweoiruiu=["));
+
+		// Second one is bogus
+		assertThatIllegalArgumentException().isThrownBy(() ->
+				v.setAttributesCSV("fweoiruiu=[de],="));
 	}
 
-	public void testAttributeCSVParsingIgoresTrailingComma() {
+	@Test
+	public void attributeCSVParsingIgnoresTrailingComma() {
 		AbstractView v = new ConcreteView();
 		v.setAttributesCSV("foo=[de],");
-		assertTrue(v.getStaticAttributes().size() == 1);
+		assertThat(v.getStaticAttributes().size()).isEqualTo(1);
 	}
 
 	/**
-	 * Check that all keys in expected have same values in actual
-	 * @param expected
-	 * @param actual
+	 * Check that all keys in expected have same values in actual.
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void checkContainsAll(Map expected, Map<String, Object> actual) {
-		Set<String> keys = expected.keySet();
-		for (Iterator<String> iter = keys.iterator(); iter.hasNext();) {
-			String key = iter.next();
-			//System.out.println("Checking model key " + key);
-			assertTrue("Value for model key '" + key + "' must match", actual.get(key) == expected.get(key));
-		}
+		expected.forEach((k, v) -> assertThat(actual.get(k)).as("Values for model key '" + k
+						+ "' must match").isEqualTo(expected.get(k)));
 	}
+
 
 	/**
 	 * Trivial concrete subclass we can use when we're interested only
 	 * in CSV parsing, which doesn't require lifecycle management
 	 */
-	private class ConcreteView extends AbstractView {
+	private static class ConcreteView extends AbstractView {
 		// Do-nothing concrete subclass
 		@Override
-		protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request, HttpServletResponse response)
+		protected void renderMergedOutputModel(Map<String, Object> model,
+				HttpServletRequest request, HttpServletResponse response)
+
 			throws ServletException, IOException {
 			throw new UnsupportedOperationException();
 		}
 	}
 
+
 	/**
-	 * Single threaded subclass of AbstractView to check superclass
-	 * behaviour
+	 * Single threaded subclass of AbstractView to check superclass behavior.
 	 */
-	private class TestView extends AbstractView {
-		private WebApplicationContext wac;
-		public boolean inited;
+	private static class TestView extends AbstractView {
+
+		private final WebApplicationContext wac;
+
+		boolean initialized;
 
 		/** Captured model in render */
-		public Map<String, Object> model;
+		Map<String, Object> model;
 
-		public TestView(WebApplicationContext wac) {
+		TestView(WebApplicationContext wac) {
 			this.wac = wac;
-
 		}
+
 		@Override
-		protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request, HttpServletResponse response)
-			throws ServletException, IOException {
-				// do nothing
-				this.model = model;
-			}
+		protected void renderMergedOutputModel(Map<String, Object> model, HttpServletRequest request,
+				HttpServletResponse response) throws ServletException, IOException {
+			this.model = model;
+		}
+
 		/**
 		 * @see org.springframework.context.support.ApplicationObjectSupport#initApplicationContext()
 		 */
 		@Override
 		protected void initApplicationContext() throws ApplicationContextException {
-			if (inited)
+			if (initialized) {
 				throw new RuntimeException("Already initialized");
-			this.inited = true;
-			assertTrue(getApplicationContext() == wac);
+			}
+			this.initialized = true;
+			assertThat(getApplicationContext() == wac).isTrue();
 		}
-
 	}
 
 }

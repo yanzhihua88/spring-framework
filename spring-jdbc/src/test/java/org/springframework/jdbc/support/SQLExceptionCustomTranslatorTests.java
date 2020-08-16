@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2008 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,22 +18,21 @@ package org.springframework.jdbc.support;
 
 import java.sql.SQLException;
 
-import junit.framework.TestCase;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.jdbc.BadSqlGrammarException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
- * Class to test custom SQLException translation.
+ * Unit tests for custom SQLException translation.
  *
  * @author Thomas Risberg
+ * @author Sam Brannen
  */
-@RunWith(JUnit4.class)
-public class SQLExceptionCustomTranslatorTests extends TestCase {
+public class SQLExceptionCustomTranslatorTests {
 
 	private static SQLErrorCodes ERROR_CODES = new SQLErrorCodes();
 
@@ -43,22 +42,23 @@ public class SQLExceptionCustomTranslatorTests extends TestCase {
 		ERROR_CODES.setCustomSqlExceptionTranslatorClass(CustomSqlExceptionTranslator.class);
 	}
 
+	private final SQLExceptionTranslator sext = new SQLErrorCodeSQLExceptionTranslator(ERROR_CODES);
+
 
 	@Test
-	public void testCustomErrorCodeTranslation() {
+	public void badSqlGrammarException() {
+		SQLException badSqlGrammarExceptionEx = SQLExceptionSubclassFactory.newSQLDataException("", "", 1);
+		DataAccessException dae = sext.translate("task", "SQL", badSqlGrammarExceptionEx);
+		assertThat(dae.getCause()).isEqualTo(badSqlGrammarExceptionEx);
+		assertThat(dae).isInstanceOf(BadSqlGrammarException.class);
+	}
 
-		SQLExceptionTranslator sext = new SQLErrorCodeSQLExceptionTranslator(ERROR_CODES);
-
-		SQLException dataIntegrityViolationEx = SQLExceptionSubclassFactory.newSQLDataException("", "", 1);
-		DataAccessException daeex = sext.translate("task", "SQL", dataIntegrityViolationEx);
-		assertEquals(dataIntegrityViolationEx, daeex.getCause());
-		assertTrue(daeex instanceof BadSqlGrammarException);
-
+	@Test
+	public void dataAccessResourceException() {
 		SQLException dataAccessResourceEx = SQLExceptionSubclassFactory.newSQLDataException("", "", 2);
-		DataAccessException darex = sext.translate("task", "SQL", dataAccessResourceEx);
-		assertEquals(dataIntegrityViolationEx, daeex.getCause());
-		assertTrue(darex instanceof TransientDataAccessResourceException);
-
+		DataAccessException dae = sext.translate("task", "SQL", dataAccessResourceEx);
+		assertThat(dae.getCause()).isEqualTo(dataAccessResourceEx);
+		assertThat(dae).isInstanceOf(TransientDataAccessResourceException.class);
 	}
 
 }

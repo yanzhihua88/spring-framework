@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2006 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,18 +18,21 @@ package org.springframework.web.servlet.view.xslt;
 
 import java.util.Locale;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.util.ClassUtils;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Rob Harrop
  * @since 2.0
  */
-public class XsltViewResolverTests extends TestCase {
+public class XsltViewResolverTests {
 
-	public void testResolveView() throws Exception {
+	@Test
+	public void resolveView() throws Exception {
 		StaticApplicationContext ctx = new StaticApplicationContext();
 
 		String prefix = ClassUtils.classPackageAsResourcePath(getClass());
@@ -42,7 +45,7 @@ public class XsltViewResolverTests extends TestCase {
 		viewResolver.setApplicationContext(ctx);
 
 		XsltView view = (XsltView) viewResolver.resolveViewName(viewName, Locale.ENGLISH);
-		assertNotNull("View should not be null", view);
-		assertEquals("Incorrect URL", prefix + viewName + suffix, view.getUrl());
+		assertThat(view).as("View should not be null").isNotNull();
+		assertThat(view.getUrl()).as("Incorrect URL").isEqualTo((prefix + viewName + suffix));
 	}
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,135 +21,131 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
+
 import javax.servlet.ServletContext;
 
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.context.ServletContextAware;
 
 /**
- * A factory providing convenient access to a {@code ContentNegotiationManager}
- * configured with one or more {@link ContentNegotiationStrategy} instances.
+ * Factory to create a {@code ContentNegotiationManager} and configure it with
+ * {@link ContentNegotiationStrategy} instances.
  *
- * <p>By default strategies for checking the extension of the request path and
- * the {@code Accept} header are registered. The path extension check will perform
- * lookups through the {@link ServletContext} and the Java Activation Framework
- * (if present) unless {@linkplain #setMediaTypes media types} are configured.
+ * <p>This factory offers properties that in turn result in configuring the
+ * underlying strategies. The table below shows the property names, their
+ * default settings, as well as the strategies that they help to configure:
  *
+ * <table>
+ * <tr>
+ * <th>Property Setter</th>
+ * <th>Default Value</th>
+ * <th>Underlying Strategy</th>
+ * <th>Enabled Or Not</th>
+ * </tr>
+ * <tr>
+ * <td>{@link #setFavorParameter favorParameter}</td>
+ * <td>false</td>
+ * <td>{@link ParameterContentNegotiationStrategy}</td>
+ * <td>Off</td>
+ * </tr>
+ * <tr>
+ * <td>{@link #setFavorPathExtension favorPathExtension}</td>
+ * <td>false (as of 5.3)</td>
+ * <td>{@link PathExtensionContentNegotiationStrategy}</td>
+ * <td>Off</td>
+ * </tr>
+ * <tr>
+ * <td>{@link #setIgnoreAcceptHeader ignoreAcceptHeader}</td>
+ * <td>false</td>
+ * <td>{@link HeaderContentNegotiationStrategy}</td>
+ * <td>Enabled</td>
+ * </tr>
+ * <tr>
+ * <td>{@link #setDefaultContentType defaultContentType}</td>
+ * <td>null</td>
+ * <td>{@link FixedContentNegotiationStrategy}</td>
+ * <td>Off</td>
+ * </tr>
+ * <tr>
+ * <td>{@link #setDefaultContentTypeStrategy defaultContentTypeStrategy}</td>
+ * <td>null</td>
+ * <td>{@link ContentNegotiationStrategy}</td>
+ * <td>Off</td>
+ * </tr>
+ * </table>
+ *
+ * <p>Alternatively you can avoid use of the above convenience builder
+ * methods and set the exact strategies to use via
+ * {@link #setStrategies(List)}.
+ *
+ * <p><strong>Deprecation Note:</strong> As of 5.2.4,
+ * {@link #setFavorPathExtension(boolean) favorPathExtension} and
+ * {@link #setIgnoreUnknownPathExtensions(boolean) ignoreUnknownPathExtensions}
+ * are deprecated in order to discourage using path extensions for content
+ * negotiation and for request mapping with similar deprecations on
+ * {@link org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
+ * RequestMappingHandlerMapping}. For further context, please read issue
+ * <a href="https://github.com/spring-projects/spring-framework/issues/24179">#24719</a>.
  * @author Rossen Stoyanchev
+ * @author Brian Clozel
  * @since 3.2
  */
 public class ContentNegotiationManagerFactoryBean
 		implements FactoryBean<ContentNegotiationManager>, ServletContextAware, InitializingBean {
 
-	private boolean favorPathExtension = true;
+	@Nullable
+	private List<ContentNegotiationStrategy> strategies;
+
 
 	private boolean favorParameter = false;
 
-	private boolean ignoreAcceptHeader = false;
+	private String parameterName = "format";
 
-	private Map<String, MediaType> mediaTypes = new HashMap<String, MediaType>();
+	private boolean favorPathExtension = true;
+
+	private Map<String, MediaType> mediaTypes = new HashMap<>();
 
 	private boolean ignoreUnknownPathExtensions = true;
 
-	private Boolean useJaf;
+	@Nullable
+	private Boolean useRegisteredExtensionsOnly;
 
-	private String parameterName = "format";
+	private boolean ignoreAcceptHeader = false;
 
+	@Nullable
 	private ContentNegotiationStrategy defaultNegotiationStrategy;
 
+	@Nullable
 	private ContentNegotiationManager contentNegotiationManager;
 
+	@Nullable
 	private ServletContext servletContext;
 
 
 	/**
-	 * Indicate whether the extension of the request path should be used to determine
-	 * the requested media type with the <em>highest priority</em>.
-	 * <p>By default this value is set to {@code true} in which case a request
-	 * for {@code /hotels.pdf} will be interpreted as a request for
-	 * {@code "application/pdf"} regardless of the {@code Accept} header.
+	 * Set the exact list of strategies to use.
+	 * <p><strong>Note:</strong> use of this method is mutually exclusive with
+	 * use of all other setters in this class which customize a default, fixed
+	 * set of strategies. See class level doc for more details.
+	 * @param strategies the strategies to use
+	 * @since 5.0
 	 */
-	public void setFavorPathExtension(boolean favorPathExtension) {
-		this.favorPathExtension = favorPathExtension;
+	public void setStrategies(@Nullable List<ContentNegotiationStrategy> strategies) {
+		this.strategies = (strategies != null ? new ArrayList<>(strategies) : null);
 	}
 
 	/**
-	 * Add mappings from file extensions to media types represented as strings.
-	 * <p>When this mapping is not set or when an extension is not found, the Java
-	 * Action Framework, if available, may be used if enabled via
-	 * {@link #setFavorPathExtension(boolean)}.
-	 * @see #addMediaType(String, MediaType)
-	 * @see #addMediaTypes(Map)
-	 */
-	public void setMediaTypes(Properties mediaTypes) {
-		if (!CollectionUtils.isEmpty(mediaTypes)) {
-			for (Entry<Object, Object> entry : mediaTypes.entrySet()) {
-				String extension = ((String)entry.getKey()).toLowerCase(Locale.ENGLISH);
-				this.mediaTypes.put(extension, MediaType.valueOf((String) entry.getValue()));
-			}
-		}
-	}
-
-	/**
-	 * Add a mapping from a file extension to a media type.
-	 * <p>If no mapping is added or when an extension is not found, the Java
-	 * Action Framework, if available, may be used if enabled via
-	 * {@link #setFavorPathExtension(boolean)}.
-	 */
-	public void addMediaType(String fileExtension, MediaType mediaType) {
-		this.mediaTypes.put(fileExtension, mediaType);
-	}
-
-	/**
-	 * Add mappings from file extensions to media types.
-	 * <p>If no mappings are added or when an extension is not found, the Java
-	 * Action Framework, if available, may be used if enabled via
-	 * {@link #setFavorPathExtension(boolean)}.
-	 */
-	public void addMediaTypes(Map<String, MediaType> mediaTypes) {
-		if (mediaTypes != null) {
-			this.mediaTypes.putAll(mediaTypes);
-		}
-	}
-
-	/**
-	 * Whether to ignore requests that have a file extension that does not match
-	 * any mapped media types. Setting this to {@code false} will result in a
-	 * {@code HttpMediaTypeNotAcceptableException} when there is no match.
-	 *
-	 * <p>By default this is set to {@code true}.
-	 */
-	public void setIgnoreUnknownPathExtensions(boolean ignoreUnknownPathExtensions) {
-		this.ignoreUnknownPathExtensions = ignoreUnknownPathExtensions;
-	}
-
-	/**
-	 * Indicate whether to use the Java Activation Framework as a fallback option
-	 * to map from file extensions to media types. This is used only when
-	 * {@link #setFavorPathExtension(boolean)} is set to {@code true}.
-	 * <p>The default value is {@code true}.
-	 * @see #setParameterName
-	 * @see #setMediaTypes
-	 */
-	public void setUseJaf(boolean useJaf) {
-		this.useJaf = useJaf;
-	}
-
-	/**
-	 * Indicate whether a request parameter should be used to determine the
-	 * requested media type with the <em>2nd highest priority</em>, i.e.
-	 * after path extensions but before the {@code Accept} header.
-	 * <p>The default value is {@code false}. If set to to {@code true}, a request
-	 * for {@code /hotels?format=pdf} will be interpreted as a request for
-	 * {@code "application/pdf"} regardless of the {@code Accept} header.
-	 * <p>To use this option effectively you must also configure the MediaType
-	 * type mappings via {@link #setMediaTypes(Properties)}.
+	 * Whether a request parameter ("format" by default) should be used to
+	 * determine the requested media type. For this option to work you must
+	 * register {@link #setMediaTypes media type mappings}.
+	 * <p>By default this is set to {@code false}.
 	 * @see #setParameterName
 	 */
 	public void setFavorParameter(boolean favorParameter) {
@@ -157,8 +153,7 @@ public class ContentNegotiationManagerFactoryBean
 	}
 
 	/**
-	 * Set the parameter name that can be used to determine the requested media type
-	 * if the {@link #setFavorParameter} property is {@code true}.
+	 * Set the query parameter name to use when {@link #setFavorParameter} is on.
 	 * <p>The default parameter name is {@code "format"}.
 	 */
 	public void setParameterName(String parameterName) {
@@ -167,10 +162,111 @@ public class ContentNegotiationManagerFactoryBean
 	}
 
 	/**
-	 * Indicate whether the HTTP {@code Accept} header should be ignored altogether.
-	 * If set the {@code Accept} header is checked at the
-	 * <em>3rd highest priority</em>, i.e. after the request path extension and
-	 * possibly a request parameter if configured.
+	 * Whether the path extension in the URL path should be used to determine
+	 * the requested media type.
+	 * <p>By default this is set to {@code false} in which case path extensions
+	 * have no impact on content negotiation.
+	 * @deprecated as of 5.2.4. See class-level note on the deprecation of path
+	 * extension config options. As there is no replacement for this method,
+	 * in 5.2.x it is necessary to set it to {@code false}. In 5.3 the default
+	 * changes to {@code false} and use of this property becomes unnecessary.
+	 */
+	@Deprecated
+	public void setFavorPathExtension(boolean favorPathExtension) {
+		this.favorPathExtension = favorPathExtension;
+	}
+
+	/**
+	 * Add a mapping from a key to a MediaType where the key are normalized to
+	 * lowercase and may have been extracted from a path extension, a filename
+	 * extension, or passed as a query parameter.
+	 * <p>The {@link #setFavorParameter(boolean) parameter strategy} requires
+	 * such mappings in order to work while the {@link #setFavorPathExtension(boolean)
+	 * path extension strategy} can fall back on lookups via
+	 * {@link ServletContext#getMimeType} and
+	 * {@link org.springframework.http.MediaTypeFactory}.
+	 * <p><strong>Note:</strong> Mappings registered here may be accessed via
+	 * {@link ContentNegotiationManager#getMediaTypeMappings()} and may be used
+	 * not only in the parameter and path extension strategies. For example,
+	 * with the Spring MVC config, e.g. {@code @EnableWebMvc} or
+	 * {@code <mvc:annotation-driven>}, the media type mappings are also plugged
+	 * in to:
+	 * <ul>
+	 * <li>Determine the media type of static resources served with
+	 * {@code ResourceHttpRequestHandler}.
+	 * <li>Determine the media type of views rendered with
+	 * {@code ContentNegotiatingViewResolver}.
+	 * <li>List safe extensions for RFD attack detection (check the Spring
+	 * Framework reference docs for details).
+	 * </ul>
+	 * @param mediaTypes media type mappings
+	 * @see #addMediaType(String, MediaType)
+	 * @see #addMediaTypes(Map)
+	 */
+	public void setMediaTypes(Properties mediaTypes) {
+		if (!CollectionUtils.isEmpty(mediaTypes)) {
+			mediaTypes.forEach((key, value) ->
+					addMediaType((String) key, MediaType.valueOf((String) value)));
+		}
+	}
+
+	/**
+	 * An alternative to {@link #setMediaTypes} for programmatic registrations.
+	 */
+	public void addMediaType(String key, MediaType mediaType) {
+		this.mediaTypes.put(key.toLowerCase(Locale.ENGLISH), mediaType);
+	}
+
+	/**
+	 * An alternative to {@link #setMediaTypes} for programmatic registrations.
+	 */
+	public void addMediaTypes(@Nullable Map<String, MediaType> mediaTypes) {
+		if (mediaTypes != null) {
+			mediaTypes.forEach(this::addMediaType);
+		}
+	}
+
+	/**
+	 * Whether to ignore requests with path extension that cannot be resolved
+	 * to any media type. Setting this to {@code false} will result in an
+	 * {@code HttpMediaTypeNotAcceptableException} if there is no match.
+	 * <p>By default this is set to {@code true}.
+	 * @deprecated as of 5.2.4. See class-level note on the deprecation of path
+	 * extension config options.
+	 */
+	@Deprecated
+	public void setIgnoreUnknownPathExtensions(boolean ignore) {
+		this.ignoreUnknownPathExtensions = ignore;
+	}
+
+	/**
+	 * Indicate whether to use the Java Activation Framework as a fallback option
+	 * to map from file extensions to media types.
+	 * @deprecated as of 5.0, in favor of {@link #setUseRegisteredExtensionsOnly(boolean)},
+	 * which has reverse behavior.
+	 */
+	@Deprecated
+	public void setUseJaf(boolean useJaf) {
+		setUseRegisteredExtensionsOnly(!useJaf);
+	}
+
+	/**
+	 * When {@link #setFavorPathExtension favorPathExtension} or
+	 * {@link #setFavorParameter(boolean)} is set, this property determines
+	 * whether to use only registered {@code MediaType} mappings or to allow
+	 * dynamic resolution, e.g. via {@link MediaTypeFactory}.
+	 * <p>By default this is not set in which case dynamic resolution is on.
+	 */
+	public void setUseRegisteredExtensionsOnly(boolean useRegisteredExtensionsOnly) {
+		this.useRegisteredExtensionsOnly = useRegisteredExtensionsOnly;
+	}
+
+	private boolean useRegisteredExtensionsOnly() {
+		return (this.useRegisteredExtensionsOnly != null && this.useRegisteredExtensionsOnly);
+	}
+
+	/**
+	 * Whether to disable checking the 'Accept' request header.
 	 * <p>By default this value is set to {@code false}.
 	 */
 	public void setIgnoreAcceptHeader(boolean ignoreAcceptHeader) {
@@ -178,27 +274,38 @@ public class ContentNegotiationManagerFactoryBean
 	}
 
 	/**
-	 * Set the default content type to use when no content type was requested.
-	 * <p>Note that internally this method creates and adds a
-	 * {@link org.springframework.web.accept.FixedContentNegotiationStrategy
-	 * FixedContentNegotiationStrategy}. Alternatively you can also provide a
-	 * custom strategy via {@link #setDefaultContentTypeStrategy}.
+	 * Set the default content type to use when no content type is requested.
+	 * <p>By default this is not set.
+	 * @see #setDefaultContentTypeStrategy
 	 */
-	public void setDefaultContentType(MediaType defaultContentType) {
-		this.defaultNegotiationStrategy = new FixedContentNegotiationStrategy(defaultContentType);
+	public void setDefaultContentType(MediaType contentType) {
+		this.defaultNegotiationStrategy = new FixedContentNegotiationStrategy(contentType);
 	}
 
 	/**
-	 * Configure a custom {@link ContentNegotiationStrategy} to use to determine
-	 * the default content type to use when no content type was requested.
-	 * <p>However also consider using {@link #setDefaultContentType} which
-	 * provides a simpler alternative to doing the same.
-	 * @since 4.1.2
+	 * Set the default content types to use when no content type is requested.
+	 * <p>By default this is not set.
+	 * @since 5.0
+	 * @see #setDefaultContentTypeStrategy
 	 */
-	public void setDefaultContentTypeStrategy(ContentNegotiationStrategy defaultStrategy) {
-		this.defaultNegotiationStrategy = defaultStrategy;
+	public void setDefaultContentTypes(List<MediaType> contentTypes) {
+		this.defaultNegotiationStrategy = new FixedContentNegotiationStrategy(contentTypes);
 	}
 
+	/**
+	 * Set a custom {@link ContentNegotiationStrategy} to use to determine
+	 * the content type to use when no content type is requested.
+	 * <p>By default this is not set.
+	 * @since 4.1.2
+	 * @see #setDefaultContentType
+	 */
+	public void setDefaultContentTypeStrategy(ContentNegotiationStrategy strategy) {
+		this.defaultNegotiationStrategy = strategy;
+	}
+
+	/**
+	 * Invoked by Spring to inject the ServletContext.
+	 */
 	@Override
 	public void setServletContext(ServletContext servletContext) {
 		this.servletContext = servletContext;
@@ -207,42 +314,70 @@ public class ContentNegotiationManagerFactoryBean
 
 	@Override
 	public void afterPropertiesSet() {
-		List<ContentNegotiationStrategy> strategies = new ArrayList<ContentNegotiationStrategy>();
+		build();
+	}
 
-		if (this.favorPathExtension) {
-			PathExtensionContentNegotiationStrategy strategy;
-			if (this.servletContext != null) {
-				strategy = new ServletPathExtensionContentNegotiationStrategy(this.servletContext, this.mediaTypes);
-			}
-			else {
-				strategy = new PathExtensionContentNegotiationStrategy(this.mediaTypes);
-			}
-			strategy.setIgnoreUnknownExtensions(this.ignoreUnknownPathExtensions);
-			if (this.useJaf != null) {
-				strategy.setUseJaf(this.useJaf);
-			}
-			strategies.add(strategy);
+	/**
+	 * Create and initialize a {@link ContentNegotiationManager} instance.
+	 * @since 5.0
+	 */
+	@SuppressWarnings("deprecation")
+	public ContentNegotiationManager build() {
+		List<ContentNegotiationStrategy> strategies = new ArrayList<>();
+
+		if (this.strategies != null) {
+			strategies.addAll(this.strategies);
 		}
-
-		if (this.favorParameter) {
-			ParameterContentNegotiationStrategy strategy = new ParameterContentNegotiationStrategy(this.mediaTypes);
-			strategy.setParameterName(this.parameterName);
-			strategies.add(strategy);
-		}
-
-		if (!this.ignoreAcceptHeader) {
-			strategies.add(new HeaderContentNegotiationStrategy());
-		}
-
-		if(this.defaultNegotiationStrategy != null) {
-			strategies.add(defaultNegotiationStrategy);
+		else {
+			if (this.favorPathExtension) {
+				PathExtensionContentNegotiationStrategy strategy;
+				if (this.servletContext != null && !useRegisteredExtensionsOnly()) {
+					strategy = new ServletPathExtensionContentNegotiationStrategy(this.servletContext, this.mediaTypes);
+				}
+				else {
+					strategy = new PathExtensionContentNegotiationStrategy(this.mediaTypes);
+				}
+				strategy.setIgnoreUnknownExtensions(this.ignoreUnknownPathExtensions);
+				if (this.useRegisteredExtensionsOnly != null) {
+					strategy.setUseRegisteredExtensionsOnly(this.useRegisteredExtensionsOnly);
+				}
+				strategies.add(strategy);
+			}
+			if (this.favorParameter) {
+				ParameterContentNegotiationStrategy strategy = new ParameterContentNegotiationStrategy(this.mediaTypes);
+				strategy.setParameterName(this.parameterName);
+				if (this.useRegisteredExtensionsOnly != null) {
+					strategy.setUseRegisteredExtensionsOnly(this.useRegisteredExtensionsOnly);
+				}
+				else {
+					strategy.setUseRegisteredExtensionsOnly(true);  // backwards compatibility
+				}
+				strategies.add(strategy);
+			}
+			if (!this.ignoreAcceptHeader) {
+				strategies.add(new HeaderContentNegotiationStrategy());
+			}
+			if (this.defaultNegotiationStrategy != null) {
+				strategies.add(this.defaultNegotiationStrategy);
+			}
 		}
 
 		this.contentNegotiationManager = new ContentNegotiationManager(strategies);
+
+		// Ensure media type mappings are available via ContentNegotiationManager#getMediaTypeMappings()
+		// independent of path extension or parameter strategies.
+
+		if (!CollectionUtils.isEmpty(this.mediaTypes) && !this.favorPathExtension && !this.favorParameter) {
+			this.contentNegotiationManager.addFileExtensionResolvers(
+					new MappingMediaTypeFileExtensionResolver(this.mediaTypes));
+		}
+
+		return this.contentNegotiationManager;
 	}
 
 
 	@Override
+	@Nullable
 	public ContentNegotiationManager getObject() {
 		return this.contentNegotiationManager;
 	}

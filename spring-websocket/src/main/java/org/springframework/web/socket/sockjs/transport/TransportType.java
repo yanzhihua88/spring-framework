@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpMethod;
+import org.springframework.lang.Nullable;
 
 /**
  * SockJS transport types.
@@ -39,15 +40,27 @@ public enum TransportType {
 
 	XHR_SEND("xhr_send", HttpMethod.POST, "cors", "jsessionid", "no_cache"),
 
-	JSONP("jsonp", HttpMethod.GET, "jsessionid", "no_cache"),
-
-	JSONP_SEND("jsonp_send", HttpMethod.POST, "jsessionid", "no_cache"),
-
 	XHR_STREAMING("xhr_streaming", HttpMethod.POST, "cors", "jsessionid", "no_cache"),
 
 	EVENT_SOURCE("eventsource", HttpMethod.GET, "origin", "jsessionid", "no_cache"),
 
 	HTML_FILE("htmlfile", HttpMethod.GET, "cors", "jsessionid", "no_cache");
+
+
+	private static final Map<String, TransportType> TRANSPORT_TYPES;
+
+	static {
+		Map<String, TransportType> transportTypes = new HashMap<>();
+		for (TransportType type : values()) {
+			transportTypes.put(type.value, type);
+		}
+		TRANSPORT_TYPES = Collections.unmodifiableMap(transportTypes);
+	}
+
+	@Nullable
+	public static TransportType fromValue(String value) {
+		return TRANSPORT_TYPES.get(value);
+	}
 
 
 	private final String value;
@@ -56,17 +69,8 @@ public enum TransportType {
 
 	private final List<String> headerHints;
 
-	private static final Map<String, TransportType> TRANSPORT_TYPES;
-	static {
-		Map<String, TransportType> transportTypes = new HashMap<String, TransportType>();
-		for (TransportType type : values()) {
-			transportTypes.put(type.value, type);
-		}
-		TRANSPORT_TYPES = Collections.unmodifiableMap(transportTypes);
-	}
 
-
-	private TransportType(String value, HttpMethod httpMethod, String... headerHints) {
+	TransportType(String value, HttpMethod httpMethod, String... headerHints) {
 		this.value = value;
 		this.httpMethod = httpMethod;
 		this.headerHints = Arrays.asList(headerHints);
@@ -77,15 +81,16 @@ public enum TransportType {
 		return this.value;
 	}
 
-	/**
-	 * The HTTP method for this transport.
-	 */
 	public HttpMethod getHttpMethod() {
 		return this.httpMethod;
 	}
 
 	public boolean sendsNoCacheInstruction() {
 		return this.headerHints.contains("no_cache");
+	}
+
+	public boolean sendsSessionCookie() {
+		return this.headerHints.contains("jsessionid");
 	}
 
 	public boolean supportsCors() {
@@ -96,13 +101,6 @@ public enum TransportType {
 		return this.headerHints.contains("cors") || this.headerHints.contains("origin");
 	}
 
-	public boolean sendsSessionCookie() {
-		return this.headerHints.contains("jsessionid");
-	}
-
-	public static TransportType fromValue(String value) {
-		return TRANSPORT_TYPES.get(value);
-	}
 
 	@Override
 	public String toString() {

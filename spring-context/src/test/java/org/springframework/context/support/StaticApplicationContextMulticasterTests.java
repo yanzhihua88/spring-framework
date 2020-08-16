@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,19 +20,24 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+import org.junit.jupiter.api.Test;
+
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.factory.support.PropertiesBeanDefinitionReader;
-import org.springframework.context.ACATester;
-import org.springframework.context.AbstractApplicationContextTests;
+import org.springframework.beans.testfixture.beans.TestBean;
 import org.springframework.context.ApplicationEvent;
-import org.springframework.context.BeanThatListens;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.event.SimpleApplicationEventMulticaster;
+import org.springframework.context.testfixture.AbstractApplicationContextTests;
+import org.springframework.context.testfixture.beans.ACATester;
+import org.springframework.context.testfixture.beans.BeanThatListens;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.EncodedResource;
-import org.springframework.tests.sample.beans.TestBean;
+import org.springframework.lang.Nullable;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for static application context with custom application event multicaster.
@@ -43,11 +48,10 @@ public class StaticApplicationContextMulticasterTests extends AbstractApplicatio
 
 	protected StaticApplicationContext sac;
 
-	/** Run for each test */
 	@Override
 	protected ConfigurableApplicationContext createContext() throws Exception {
 		StaticApplicationContext parent = new StaticApplicationContext();
-		Map<String, String> m = new HashMap<String, String>();
+		Map<String, String> m = new HashMap<>();
 		m.put("name", "Roderick");
 		parent.registerPrototype("rod", TestBean.class, new MutablePropertyValues(m));
 		m.put("name", "Albert");
@@ -74,17 +78,18 @@ public class StaticApplicationContextMulticasterTests extends AbstractApplicatio
 		return sac;
 	}
 
-	/** Overridden */
+	@Test
 	@Override
-	public void testCount() {
+	public void count() {
 		assertCount(15);
 	}
 
+	@Test
 	@Override
-	public void testEvents() throws Exception {
+	public void events() throws Exception {
 		TestApplicationEventMulticaster.counter = 0;
-		super.testEvents();
-		assertEquals(1, TestApplicationEventMulticaster.counter);
+		super.events();
+		assertThat(TestApplicationEventMulticaster.counter).isEqualTo(1);
 	}
 
 
@@ -93,7 +98,7 @@ public class StaticApplicationContextMulticasterTests extends AbstractApplicatio
 		private static int counter = 0;
 
 		@Override
-		public void multicastEvent(ApplicationEvent event, ResolvableType eventType) {
+		public void multicastEvent(ApplicationEvent event, @Nullable ResolvableType eventType) {
 			super.multicastEvent(event, eventType);
 			counter++;
 		}

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,18 +23,23 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Map;
+
 import javax.jms.BytesMessage;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
+import com.fasterxml.jackson.annotation.JsonView;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 
 import org.springframework.beans.factory.BeanClassLoaderAware;
+import org.springframework.core.MethodParameter;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 
@@ -50,14 +55,15 @@ import org.springframework.util.ClassUtils;
  * <li>{@link DeserializationFeature#FAIL_ON_UNKNOWN_PROPERTIES} is disabled</li>
  * </ul>
  *
- * <p>Tested against Jackson 2.2; compatible with Jackson 2.0 and higher.
+ * <p>Compatible with Jackson 2.6 and higher, as of Spring 4.3.
  *
  * @author Mark Pollack
  * @author Dave Syer
  * @author Juergen Hoeller
+ * @author Stephane Nicoll
  * @since 3.1.4
  */
-public class MappingJackson2MessageConverter implements MessageConverter, BeanClassLoaderAware {
+public class MappingJackson2MessageConverter implements SmartMessageConverter, BeanClassLoaderAware {
 
 	/**
 	 * The default encoding used for writing to text messages: UTF-8.
@@ -69,16 +75,20 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 
 	private MessageType targetType = MessageType.BYTES;
 
-	private String encoding = DEFAULT_ENCODING;
+	@Nullable
+	private String encoding;
 
+	@Nullable
 	private String encodingPropertyName;
 
+	@Nullable
 	private String typeIdPropertyName;
 
-	private Map<String, Class<?>> idClassMappings = new HashMap<String, Class<?>>();
+	private Map<String, Class<?>> idClassMappings = new HashMap<>();
 
-	private Map<Class<?>, String> classIdMappings = new HashMap<Class<?>, String>();
+	private Map<Class<?>, String> classIdMappings = new HashMap<>();
 
+	@Nullable
 	private ClassLoader beanClassLoader;
 
 
@@ -113,7 +123,7 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	/**
 	 * Specify the encoding to use when converting to and from text-based
 	 * message body content. The default encoding will be "UTF-8".
-	 * <p>When reading from a a text-based message, an encoding may have been
+	 * <p>When reading from a text-based message, an encoding may have been
 	 * suggested through a special JMS property which will then be preferred
 	 * over the encoding set on this MessageConverter instance.
 	 * @see #setEncodingPropertyName
@@ -152,13 +162,11 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	 * @param typeIdMappings a Map with type id values as keys and Java classes as values
 	 */
 	public void setTypeIdMappings(Map<String, Class<?>> typeIdMappings) {
-		this.idClassMappings = new HashMap<String, Class<?>>();
-		for (Map.Entry<String, Class<?>> entry : typeIdMappings.entrySet()) {
-			String id = entry.getKey();
-			Class<?> clazz = entry.getValue();
+		this.idClassMappings = new HashMap<>();
+		typeIdMappings.forEach((id, clazz) -> {
 			this.idClassMappings.put(id, clazz);
 			this.classIdMappings.put(clazz, id);
-		}
+		});
 	}
 
 	@Override
@@ -173,13 +181,13 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 		try {
 			switch (this.targetType) {
 				case TEXT:
-					message = mapToTextMessage(object, session, this.objectMapper);
+					message = mapToTextMessage(object, session, this.objectMapper.writer());
 					break;
 				case BYTES:
-					message = mapToBytesMessage(object, session, this.objectMapper);
+					message = mapToBytesMessage(object, session, this.objectMapper.writer());
 					break;
 				default:
-					message = mapToMessage(object, session, this.objectMapper, this.targetType);
+					message = mapToMessage(object, session, this.objectMapper.writer(), this.targetType);
 			}
 		}
 		catch (IOException ex) {
@@ -187,6 +195,35 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 		}
 		setTypeIdOnMessage(object, message);
 		return message;
+	}
+
+	@Override
+	public Message toMessage(Object object, Session session, @Nullable Object conversionHint)
+			throws JMSException, MessageConversionException {
+
+		return toMessage(object, session, getSerializationView(conversionHint));
+	}
+
+	/**
+	 * Convert a Java object to a JMS Message using the specified json view
+	 * and the supplied session  to create the message object.
+	 * @param object the object to convert
+	 * @param session the Session to use for creating a JMS Message
+	 * @param jsonView the view to use to filter the content
+	 * @return the JMS Message
+	 * @throws javax.jms.JMSException if thrown by JMS API methods
+	 * @throws MessageConversionException in case of conversion failure
+	 * @since 4.3
+	 */
+	public Message toMessage(Object object, Session session, @Nullable Class<?> jsonView)
+			throws JMSException, MessageConversionException {
+
+		if (jsonView != null) {
+			return toMessage(object, session, this.objectMapper.writerWithView(jsonView));
+		}
+		else {
+			return toMessage(object, session, this.objectMapper.writer());
+		}
 	}
 
 	@Override
@@ -200,22 +237,46 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 		}
 	}
 
+	protected Message toMessage(Object object, Session session, ObjectWriter objectWriter)
+			throws JMSException, MessageConversionException {
+
+		Message message;
+		try {
+			switch (this.targetType) {
+				case TEXT:
+					message = mapToTextMessage(object, session, objectWriter);
+					break;
+				case BYTES:
+					message = mapToBytesMessage(object, session, objectWriter);
+					break;
+				default:
+					message = mapToMessage(object, session, objectWriter, this.targetType);
+			}
+		}
+		catch (IOException ex) {
+			throw new MessageConversionException("Could not map JSON object [" + object + "]", ex);
+		}
+		setTypeIdOnMessage(object, message);
+		return message;
+	}
+
 
 	/**
 	 * Map the given object to a {@link TextMessage}.
 	 * @param object the object to be mapped
 	 * @param session current JMS session
-	 * @param objectMapper the mapper to use
+	 * @param objectWriter the writer to use
 	 * @return the resulting message
 	 * @throws JMSException if thrown by JMS methods
 	 * @throws IOException in case of I/O errors
+	 * @since 4.3
 	 * @see Session#createBytesMessage
 	 */
-	protected TextMessage mapToTextMessage(Object object, Session session, ObjectMapper objectMapper)
+	protected TextMessage mapToTextMessage(Object object, Session session, ObjectWriter objectWriter)
 			throws JMSException, IOException {
 
 		StringWriter writer = new StringWriter();
-		objectMapper.writeValue(writer, object);
+		objectWriter.writeValue(writer, object);
 		return session.createTextMessage(writer.toString());
 	}
 
@@ -223,23 +284,32 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	 * Map the given object to a {@link BytesMessage}.
 	 * @param object the object to be mapped
 	 * @param session current JMS session
-	 * @param objectMapper the mapper to use
+	 * @param objectWriter the writer to use
 	 * @return the resulting message
 	 * @throws JMSException if thrown by JMS methods
 	 * @throws IOException in case of I/O errors
+	 * @since 4.3
 	 * @see Session#createBytesMessage
 	 */
-	protected BytesMessage mapToBytesMessage(Object object, Session session, ObjectMapper objectMapper)
+	protected BytesMessage mapToBytesMessage(Object object, Session session, ObjectWriter objectWriter)
 			throws JMSException, IOException {
 
 		ByteArrayOutputStream bos = new ByteArrayOutputStream(1024);
-		OutputStreamWriter writer = new OutputStreamWriter(bos, this.encoding);
-		objectMapper.writeValue(writer, object);
+		if (this.encoding != null) {
+			OutputStreamWriter writer = new OutputStreamWriter(bos, this.encoding);
+			objectWriter.writeValue(writer, object);
+		}
+		else {
+			// Jackson usually defaults to UTF-8 but can also go straight to bytes, e.g. for Smile.
+			// We use a direct byte array argument for the latter case to work as well.
+			objectWriter.writeValue(bos, object);
+		}
 
 		BytesMessage message = session.createBytesMessage();
 		message.writeBytes(bos.toByteArray());
 		if (this.encodingPropertyName != null) {
-			message.setStringProperty(this.encodingPropertyName, this.encoding);
+			message.setStringProperty(this.encodingPropertyName,
+					(this.encoding != null ? this.encoding : DEFAULT_ENCODING));
 		}
 		return message;
 	}
@@ -251,13 +321,13 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	 * <p>The default implementation throws an {@link IllegalArgumentException}.
 	 * @param object the object to marshal
 	 * @param session the JMS Session
-	 * @param objectMapper the mapper to use
+	 * @param objectWriter the writer to use
 	 * @param targetType the target message type (other than TEXT or BYTES)
 	 * @return the resulting message
 	 * @throws JMSException if thrown by JMS methods
 	 * @throws IOException in case of I/O errors
 	 */
-	protected Message mapToMessage(Object object, Session session, ObjectMapper objectMapper, MessageType targetType)
+	protected Message mapToMessage(Object object, Session session, ObjectWriter objectWriter, MessageType targetType)
 			throws JMSException, IOException {
 
 		throw new IllegalArgumentException("Unsupported message type [" + targetType +
@@ -270,7 +340,7 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	 * sets the resulting value (either a mapped id or the raw Java class name)
 	 * into the configured type id message property.
 	 * @param object the payload object to set a type id for
-	 * @param message the JMS Message to set the type id on
+	 * @param message the JMS Message on which to set the type id property
 	 * @throws JMSException if thrown by JMS methods
 	 * @see #getJavaTypeForMessage(javax.jms.Message)
 	 * @see #setTypeIdPropertyName(String)
@@ -285,7 +355,6 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 			message.setStringProperty(this.typeIdPropertyName, typeId);
 		}
 	}
-
 
 	/**
 	 * Convenience method to dispatch to converters for individual message types.
@@ -334,12 +403,18 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 		}
 		byte[] bytes = new byte[(int) message.getBodyLength()];
 		message.readBytes(bytes);
-		try {
-			String body = new String(bytes, encoding);
-			return this.objectMapper.readValue(body, targetJavaType);
+		if (encoding != null) {
+			try {
+				String body = new String(bytes, encoding);
+				return this.objectMapper.readValue(body, targetJavaType);
+			}
+			catch (UnsupportedEncodingException ex) {
+				throw new MessageConversionException("Cannot convert bytes to String", ex);
+			}
 		}
-		catch (UnsupportedEncodingException ex) {
-			throw new MessageConversionException("Cannot convert bytes to String", ex);
+		else {
+			// Jackson internally performs encoding detection, falling back to UTF-8.
+			return this.objectMapper.readValue(bytes, targetJavaType);
 		}
 	}
 
@@ -367,7 +442,7 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	 * <p>The default implementation parses the configured type id property name
 	 * and consults the configured type id mapping. This can be overridden with
 	 * a different strategy, e.g. doing some heuristics based on message origin.
-	 * @param message the JMS Message to set the type id on
+	 * @param message the JMS Message from which to get the type id property
 	 * @throws JMSException if thrown by JMS methods
 	 * @see #setTypeIdOnMessage(Object, javax.jms.Message)
 	 * @see #setTypeIdPropertyName(String)
@@ -376,7 +451,9 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 	protected JavaType getJavaTypeForMessage(Message message) throws JMSException {
 		String typeId = message.getStringProperty(this.typeIdPropertyName);
 		if (typeId == null) {
-			throw new MessageConversionException("Could not find type id property [" + this.typeIdPropertyName + "]");
+			throw new MessageConversionException(
+					"Could not find type id property [" + this.typeIdPropertyName + "] on message [" +
+					message.getJMSMessageID() + "] from destination [" + message.getJMSDestination() + "]");
 		}
 		Class<?> mappedClass = this.idClassMappings.get(typeId);
 		if (mappedClass != null) {
@@ -389,6 +466,45 @@ public class MappingJackson2MessageConverter implements MessageConverter, BeanCl
 		catch (Throwable ex) {
 			throw new MessageConversionException("Failed to resolve type id [" + typeId + "]", ex);
 		}
+	}
+
+	/**
+	 * Determine a Jackson serialization view based on the given conversion hint.
+	 * @param conversionHint the conversion hint Object as passed into the
+	 * converter for the current conversion attempt
+	 * @return the serialization view class, or {@code null} if none
+	 */
+	@Nullable
+	protected Class<?> getSerializationView(@Nullable Object conversionHint) {
+		if (conversionHint instanceof MethodParameter) {
+			MethodParameter methodParam = (MethodParameter) conversionHint;
+			JsonView annotation = methodParam.getParameterAnnotation(JsonView.class);
+			if (annotation == null) {
+				annotation = methodParam.getMethodAnnotation(JsonView.class);
+				if (annotation == null) {
+					return null;
+				}
+			}
+			return extractViewClass(annotation, conversionHint);
+		}
+		else if (conversionHint instanceof JsonView) {
+			return extractViewClass((JsonView) conversionHint, conversionHint);
+		}
+		else if (conversionHint instanceof Class) {
+			return (Class<?>) conversionHint;
+		}
+		else {
+			return null;
+		}
+	}
+
+	private Class<?> extractViewClass(JsonView annotation, Object conversionHint) {
+		Class<?>[] classes = annotation.value();
+		if (classes.length != 1) {
+			throw new IllegalArgumentException(
+					"@JsonView only supported for handler methods with exactly 1 class argument: " + conversionHint);
+		}
+		return classes[0];
 	}
 
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,10 +24,12 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.lang.Nullable;
+import org.springframework.util.StreamUtils;
 
 /**
- * {@link ClientHttpResponse} implementation that uses
- * Apache HttpComponents HttpClient to execute requests.
+ * {@link ClientHttpResponse} implementation based on
+ * Apache HttpComponents HttpAsyncClient.
  *
  * <p>Created via the {@link HttpComponentsAsyncClientHttpRequest}.
  *
@@ -35,11 +37,15 @@ import org.springframework.http.HttpHeaders;
  * @author Arjen Poutsma
  * @since 4.0
  * @see HttpComponentsAsyncClientHttpRequest#executeAsync()
+ * @deprecated as of Spring 5.0, in favor of
+ * {@link org.springframework.http.client.reactive.HttpComponentsClientHttpConnector}
  */
+@Deprecated
 final class HttpComponentsAsyncClientHttpResponse extends AbstractClientHttpResponse {
 
 	private final HttpResponse httpResponse;
 
+	@Nullable
 	private HttpHeaders headers;
 
 
@@ -72,7 +78,7 @@ final class HttpComponentsAsyncClientHttpResponse extends AbstractClientHttpResp
 	@Override
 	public InputStream getBody() throws IOException {
 		HttpEntity entity = this.httpResponse.getEntity();
-		return entity != null ? entity.getContent() : null;
+		return (entity != null ? entity.getContent() : StreamUtils.emptyInput());
 	}
 
 	@Override

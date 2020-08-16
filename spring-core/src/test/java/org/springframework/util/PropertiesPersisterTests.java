@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2005 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,64 +23,74 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.Properties;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Juergen Hoeller
  * @since 11.01.2005
  */
-public class PropertiesPersisterTests extends TestCase {
+class PropertiesPersisterTests {
 
-	public void testPropertiesPersister() throws IOException {
+	@Test
+	void propertiesPersister() throws IOException {
 		String propString = "code1=message1\ncode2:message2";
 		Properties props = loadProperties(propString, false);
 		String propCopy = storeProperties(props, null, false);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithWhitespace() throws IOException {
+	@Test
+	void propertiesPersisterWithWhitespace() throws IOException {
 		String propString = " code1\t= \tmessage1\n  code2 \t  :\t mess\\\n \t  age2";
 		Properties props = loadProperties(propString, false);
 		String propCopy = storeProperties(props, null, false);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithHeader() throws IOException {
+	@Test
+	void propertiesPersisterWithHeader() throws IOException {
 		String propString = "code1=message1\ncode2:message2";
 		Properties props = loadProperties(propString, false);
 		String propCopy = storeProperties(props, "myHeader", false);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithEmptyValue() throws IOException {
+	@Test
+	void propertiesPersisterWithEmptyValue() throws IOException {
 		String propString = "code1=message1\ncode2:message2\ncode3=";
 		Properties props = loadProperties(propString, false);
 		String propCopy = storeProperties(props, null, false);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithReader() throws IOException {
+	@Test
+	void propertiesPersisterWithReader() throws IOException {
 		String propString = "code1=message1\ncode2:message2";
 		Properties props = loadProperties(propString, true);
 		String propCopy = storeProperties(props, null, true);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithReaderAndWhitespace() throws IOException {
+	@Test
+	void propertiesPersisterWithReaderAndWhitespace() throws IOException {
 		String propString = " code1\t= \tmessage1\n  code2 \t  :\t mess\\\n \t  age2";
 		Properties props = loadProperties(propString, true);
 		String propCopy = storeProperties(props, null, true);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithReaderAndHeader() throws IOException {
+	@Test
+	void propertiesPersisterWithReaderAndHeader() throws IOException {
 		String propString = "code1\t=\tmessage1\n  code2 \t  : \t message2";
 		Properties props = loadProperties(propString, true);
 		String propCopy = storeProperties(props, "myHeader", true);
 		loadProperties(propCopy, false);
 	}
 
-	public void testPropertiesPersisterWithReaderAndEmptyValue() throws IOException {
+	@Test
+	void propertiesPersisterWithReaderAndEmptyValue() throws IOException {
 		String propString = "code1=message1\ncode2:message2\ncode3=";
 		Properties props = loadProperties(propString, true);
 		String propCopy = storeProperties(props, null, true);
@@ -96,8 +106,8 @@ public class PropertiesPersisterTests extends TestCase {
 		else {
 			persister.load(props, new ByteArrayInputStream(propString.getBytes()));
 		}
-		assertEquals("message1", props.getProperty("code1"));
-		assertEquals("message2", props.getProperty("code2"));
+		assertThat(props.getProperty("code1")).isEqualTo("message1");
+		assertThat(props.getProperty("code2")).isEqualTo("message2");
 		return props;
 	}
 
@@ -115,10 +125,10 @@ public class PropertiesPersisterTests extends TestCase {
 			propCopy = new String(propOut.toByteArray());
 		}
 		if (header != null) {
-			assertTrue(propCopy.indexOf(header) != -1);
+			assertThat(propCopy.contains(header)).isTrue();
 		}
-		assertTrue(propCopy.indexOf("\ncode1=message1") != -1);
-		assertTrue(propCopy.indexOf("\ncode2=message2") != -1);
+		assertThat(propCopy.contains("\ncode1=message1")).isTrue();
+		assertThat(propCopy.contains("\ncode2=message2")).isTrue();
 		return propCopy;
 	}
 

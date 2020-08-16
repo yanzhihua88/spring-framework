@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,22 +16,22 @@
 
 package org.springframework.web.bind.support;
 
-import java.io.IOException;
 import java.util.List;
+
 import javax.servlet.MultipartConfigElement;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
 
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.NetworkConnector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -39,44 +39,36 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.util.SocketUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.context.request.ServletWebRequest;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Brian Clozel
+ * @author Sam Brannen
  */
 public class WebRequestDataBinderIntegrationTests {
+
+	private static Server jettyServer;
+
+	private static final PartsServlet partsServlet = new PartsServlet();
+
+	private static final PartListServlet partListServlet = new PartListServlet();
+
+	private final RestTemplate template = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
 
 	protected static String baseUrl;
 
 	protected static MediaType contentType;
 
-	private static Server jettyServer;
 
-	private RestTemplate template;
-
-	private static PartsServlet partsServlet;
-
-	private static PartListServlet partListServlet;
-
-
-	@Before
-	public void createTemplate() {
-		template = new RestTemplate(new HttpComponentsClientHttpRequestFactory());
-	}
-
-	@BeforeClass
+	@BeforeAll
 	public static void startJettyServer() throws Exception {
-		int port = SocketUtils.findAvailableTcpPort();
-		jettyServer = new Server(port);
-		baseUrl = "http://localhost:" + port;
-		ServletContextHandler handler = new ServletContextHandler();
+		// Let server pick its own random, available port.
+		jettyServer = new Server(0);
 
-		partsServlet = new PartsServlet();
-		partListServlet = new PartListServlet();
+		ServletContextHandler handler = new ServletContextHandler();
 
 		MultipartConfigElement multipartConfig = new MultipartConfigElement("");
 
@@ -87,11 +79,16 @@ public class WebRequestDataBinderIntegrationTests {
 		holder = new ServletHolder(partListServlet);
 		holder.getRegistration().setMultipartConfig(multipartConfig);
 		handler.addServlet(holder, "/partlist");
+
 		jettyServer.setHandler(handler);
 		jettyServer.start();
+
+		Connector[] connectors = jettyServer.getConnectors();
+		NetworkConnector connector = (NetworkConnector) connectors[0];
+		baseUrl = "http://localhost:" + connector.getLocalPort();
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void stopJettyServer() throws Exception {
 		if (jettyServer != null) {
 			jettyServer.stop();
@@ -100,29 +97,27 @@ public class WebRequestDataBinderIntegrationTests {
 
 
 	@Test
-	public void testPartsBinding() {
-
+	public void partsBinding() {
 		PartsBean bean = new PartsBean();
 		partsServlet.setBean(bean);
 
-		MultiValueMap<String, Object> parts = new LinkedMultiValueMap<String, Object>();
+		MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
 		Resource firstPart = new ClassPathResource("/org/springframework/http/converter/logo.jpg");
 		parts.add("firstPart", firstPart);
 		parts.add("secondPart", "secondValue");
 
 		template.postForLocation(baseUrl + "/parts", parts);
 
-		assertNotNull(bean.getFirstPart());
-		assertNotNull(bean.getSecondPart());
+		assertThat(bean.getFirstPart()).isNotNull();
+		assertThat(bean.getSecondPart()).isNotNull();
 	}
 
 	@Test
-	public void testPartListBinding() {
-
+	public void partListBinding() {
 		PartListBean bean = new PartListBean();
 		partListServlet.setBean(bean);
 
-		MultiValueMap<String, Object> parts = new LinkedMultiValueMap<String, Object>();
+		MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
 		parts.add("partList", "first value");
 		parts.add("partList", "second value");
 		Resource logo = new ClassPathResource("/org/springframework/http/converter/logo.jpg");
@@ -130,8 +125,8 @@ public class WebRequestDataBinderIntegrationTests {
 
 		template.postForLocation(baseUrl + "/partlist", parts);
 
-		assertNotNull(bean.getPartList());
-		assertEquals(parts.get("partList").size(), bean.getPartList().size());
+		assertThat(bean.getPartList()).isNotNull();
+		assertThat(bean.getPartList().size()).isEqualTo(parts.get("partList").size());
 	}
 
 
@@ -141,14 +136,10 @@ public class WebRequestDataBinderIntegrationTests {
 		private T bean;
 
 		@Override
-		public void service(HttpServletRequest request, HttpServletResponse response) throws
-				ServletException, IOException {
-
+		public void service(HttpServletRequest request, HttpServletResponse response) {
 			WebRequestDataBinder binder = new WebRequestDataBinder(bean);
 			ServletWebRequest webRequest = new ServletWebRequest(request, response);
-
 			binder.bind(webRequest);
-
 			response.setStatus(HttpServletResponse.SC_OK);
 		}
 
@@ -156,6 +147,7 @@ public class WebRequestDataBinderIntegrationTests {
 			this.bean = bean;
 		}
 	}
+
 
 	private static class PartsBean {
 
@@ -182,9 +174,11 @@ public class WebRequestDataBinderIntegrationTests {
 		}
 	}
 
+
 	@SuppressWarnings("serial")
 	private static class PartsServlet extends AbstractStandardMultipartServlet<PartsBean> {
 	}
+
 
 	private static class PartListBean {
 
@@ -199,6 +193,7 @@ public class WebRequestDataBinderIntegrationTests {
 			this.partList = partList;
 		}
 	}
+
 
 	@SuppressWarnings("serial")
 	private static class PartListServlet extends AbstractStandardMultipartServlet<PartListBean> {

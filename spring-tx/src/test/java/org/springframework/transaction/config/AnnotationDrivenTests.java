@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,32 +18,45 @@ package org.springframework.transaction.config;
 
 import java.io.Serializable;
 
-import junit.framework.TestCase;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
-import org.springframework.tests.transaction.CallCountingTransactionManager;
+import org.springframework.core.testfixture.io.SerializationTestUtils;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.util.SerializationTestUtils;
+import org.springframework.transaction.testfixture.CallCountingTransactionManager;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Rob Harrop
  * @author Juergen Hoeller
  */
-public class AnnotationDrivenTests extends TestCase {
+public class AnnotationDrivenTests {
 
-	public void testWithProxyTargetClass() throws Exception {
+	@Test
+	public void withProxyTargetClass() throws Exception {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("annotationDrivenProxyTargetClassTests.xml", getClass());
 		doTestWithMultipleTransactionManagers(context);
 	}
 
-	public void testWithConfigurationClass() throws Exception {
+	@Test
+	public void withConfigurationClass() throws Exception {
+		ApplicationContext parent = new AnnotationConfigApplicationContext(TransactionManagerConfiguration.class);
+		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(new String[] {"annotationDrivenConfigurationClassTests.xml"}, getClass(), parent);
+		doTestWithMultipleTransactionManagers(context);
+	}
+
+	@Test
+	public void withAnnotatedTransactionManagers() throws Exception {
 		AnnotationConfigApplicationContext parent = new AnnotationConfigApplicationContext();
-		parent.register(TransactionManagerConfiguration.class);
+		parent.registerBeanDefinition("transactionManager1", new RootBeanDefinition(SynchTransactionManager.class));
+		parent.registerBeanDefinition("transactionManager2", new RootBeanDefinition(NoSynchTransactionManager.class));
 		parent.refresh();
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(new String[] {"annotationDrivenConfigurationClassTests.xml"}, getClass(), parent);
 		doTestWithMultipleTransactionManagers(context);
@@ -53,33 +66,37 @@ public class AnnotationDrivenTests extends TestCase {
 		CallCountingTransactionManager tm1 = context.getBean("transactionManager1", CallCountingTransactionManager.class);
 		CallCountingTransactionManager tm2 = context.getBean("transactionManager2", CallCountingTransactionManager.class);
 		TransactionalService service = context.getBean("service", TransactionalService.class);
-		assertTrue(AopUtils.isCglibProxy(service));
+		assertThat(AopUtils.isCglibProxy(service)).isTrue();
 		service.setSomething("someName");
-		assertEquals(1, tm1.commits);
-		assertEquals(0, tm2.commits);
+		assertThat(tm1.commits).isEqualTo(1);
+		assertThat(tm2.commits).isEqualTo(0);
 		service.doSomething();
-		assertEquals(1, tm1.commits);
-		assertEquals(1, tm2.commits);
+		assertThat(tm1.commits).isEqualTo(1);
+		assertThat(tm2.commits).isEqualTo(1);
 		service.setSomething("someName");
-		assertEquals(2, tm1.commits);
-		assertEquals(1, tm2.commits);
+		assertThat(tm1.commits).isEqualTo(2);
+		assertThat(tm2.commits).isEqualTo(1);
 		service.doSomething();
-		assertEquals(2, tm1.commits);
-		assertEquals(2, tm2.commits);
+		assertThat(tm1.commits).isEqualTo(2);
+		assertThat(tm2.commits).isEqualTo(2);
 	}
 
-	public void testSerializableWithPreviousUsage() throws Exception {
+	@Test
+	@SuppressWarnings("resource")
+	public void serializableWithPreviousUsage() throws Exception {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("annotationDrivenProxyTargetClassTests.xml", getClass());
 		TransactionalService service = context.getBean("service", TransactionalService.class);
 		service.setSomething("someName");
-		service = (TransactionalService) SerializationTestUtils.serializeAndDeserialize(service);
+		service = SerializationTestUtils.serializeAndDeserialize(service);
 		service.setSomething("someName");
 	}
 
-	public void testSerializableWithoutPreviousUsage() throws Exception {
+	@Test
+	@SuppressWarnings("resource")
+	public void serializableWithoutPreviousUsage() throws Exception {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("annotationDrivenProxyTargetClassTests.xml", getClass());
 		TransactionalService service = context.getBean("service", TransactionalService.class);
-		service = (TransactionalService) SerializationTestUtils.serializeAndDeserialize(service);
+		service = SerializationTestUtils.serializeAndDeserialize(service);
 		service.setSomething("someName");
 	}
 
@@ -90,12 +107,12 @@ public class AnnotationDrivenTests extends TestCase {
 		@Override
 		public Object invoke(MethodInvocation methodInvocation) throws Throwable {
 			if (methodInvocation.getMethod().getName().equals("setSomething")) {
-				assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
-				assertTrue(TransactionSynchronizationManager.isSynchronizationActive());
+				assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+				assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isTrue();
 			}
 			else {
-				assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-				assertFalse(TransactionSynchronizationManager.isSynchronizationActive());
+				assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+				assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isFalse();
 			}
 			return methodInvocation.proceed();
 		}

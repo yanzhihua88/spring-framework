@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 package org.springframework.web.servlet.handler;
 
 import java.util.Set;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -24,17 +25,21 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.core.Ordered;
+import org.springframework.lang.Nullable;
+import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 
 /**
  * Abstract base class for {@link HandlerExceptionResolver} implementations.
  *
- * <p>Provides a set of mapped handlers that the resolver should map to,
- * and the {@link Ordered} implementation.
+ * <p>Supports mapped {@linkplain #setMappedHandlers handlers} and
+ * {@linkplain #setMappedHandlerClasses handler classes} that the resolver
+ * should be applied to and implements the {@link Ordered} interface.
  *
  * @author Arjen Poutsma
  * @author Juergen Hoeller
+ * @author Sam Brannen
  * @since 3.0
  */
 public abstract class AbstractHandlerExceptionResolver implements HandlerExceptionResolver, Ordered {
@@ -42,16 +47,19 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 	private static final String HEADER_CACHE_CONTROL = "Cache-Control";
 
 
-	/** Logger available to subclasses */
+	/** Logger available to subclasses. */
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private int order = Ordered.LOWEST_PRECEDENCE;
 
+	@Nullable
 	private Set<?> mappedHandlers;
 
+	@Nullable
 	private Class<?>[] mappedHandlerClasses;
 
-	private Log warnLogger = LogFactory.getLog(getClass());
+	@Nullable
+	private Log warnLogger;
 
 	private boolean preventResponseCaching = false;
 
@@ -67,10 +75,10 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 
 	/**
 	 * Specify the set of handlers that this exception resolver should apply to.
-	 * The exception mappings and the default error view will only apply to the specified handlers.
-	 * <p>If no handlers and handler classes are set, the exception mappings and the default error
+	 * <p>The exception mappings and the default error view will only apply to the specified handlers.
+	 * <p>If no handlers or handler classes are set, the exception mappings and the default error
 	 * view will apply to all handlers. This means that a specified default error view will be used
-	 * as fallback for all exceptions; any further HandlerExceptionResolvers in the chain will be
+	 * as a fallback for all exceptions; any further HandlerExceptionResolvers in the chain will be
 	 * ignored in this case.
 	 */
 	public void setMappedHandlers(Set<?> mappedHandlers) {
@@ -79,37 +87,38 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 
 	/**
 	 * Specify the set of classes that this exception resolver should apply to.
-	 * The exception mappings and the default error view will only apply to handlers of the
-	 * specified type; the specified types may be interfaces and superclasses of handlers as well.
-	 * <p>If no handlers and handler classes are set, the exception mappings and the default error
+	 * <p>The exception mappings and the default error view will only apply to handlers of the
+	 * specified types; the specified types may be interfaces or superclasses of handlers as well.
+	 * <p>If no handlers or handler classes are set, the exception mappings and the default error
 	 * view will apply to all handlers. This means that a specified default error view will be used
-	 * as fallback for all exceptions; any further HandlerExceptionResolvers in the chain will be
+	 * as a fallback for all exceptions; any further HandlerExceptionResolvers in the chain will be
 	 * ignored in this case.
 	 */
-	public void setMappedHandlerClasses(Class<?>[] mappedHandlerClasses) {
+	public void setMappedHandlerClasses(Class<?>... mappedHandlerClasses) {
 		this.mappedHandlerClasses = mappedHandlerClasses;
 	}
 
 	/**
 	 * Set the log category for warn logging. The name will be passed to the underlying logger
-	 * implementation through Commons Logging, getting interpreted as log category according
-	 * to the logger's configuration.
-	 * <p>Default is warn logging using the {@link AbstractHandlerExceptionResolver} class name derived logger.
-	 * Set to {@code null} to disable warn logging.
-	 * Override the {@link #logException} method for custom logging.
+	 * implementation through Commons Logging, getting interpreted as a log category according
+	 * to the logger's configuration. If {@code null} or empty String is passed, warn logging
+	 * is turned off.
+	 * <p>By default there is no warn logging although subclasses like
+	 * {@link org.springframework.web.servlet.mvc.support.DefaultHandlerExceptionResolver}
+	 * can change that default. Specify this setting to activate warn logging into a specific
+	 * category. Alternatively, override the {@link #logException} method for custom logging.
 	 * @see org.apache.commons.logging.LogFactory#getLog(String)
-	 * @see org.apache.log4j.Logger#getLogger(String)
 	 * @see java.util.logging.Logger#getLogger(String)
 	 */
 	public void setWarnLogCategory(String loggerName) {
-		this.warnLogger = (loggerName != null ? LogFactory.getLog(loggerName) : null);
+		this.warnLogger = (StringUtils.hasLength(loggerName) ? LogFactory.getLog(loggerName) : null);
 	}
 
 	/**
 	 * Specify whether to prevent HTTP response caching for any view resolved
-	 * by this HandlerExceptionResolver.
-	 * <p>Default is "false". Switch this to "true" in order to automatically
-	 * generate HTTP response headers that suppress response caching.
+	 * by this exception resolver.
+	 * <p>Default is {@code false}. Switch this to {@code true} in order to
+	 * automatically generate HTTP response headers that suppress response caching.
 	 */
 	public void setPreventResponseCaching(boolean preventResponseCaching) {
 		this.preventResponseCaching = preventResponseCaching;
@@ -117,26 +126,28 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 
 
 	/**
-	 * Checks whether this resolver is supposed to apply (i.e. the handler matches
-	 * in case of "mappedHandlers" having been specified), then delegates to the
-	 * {@link #doResolveException} template method.
+	 * Check whether this resolver is supposed to apply (i.e. if the supplied handler
+	 * matches any of the configured {@linkplain #setMappedHandlers handlers} or
+	 * {@linkplain #setMappedHandlerClasses handler classes}), and then delegate
+	 * to the {@link #doResolveException} template method.
 	 */
 	@Override
-	public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response,
-			Object handler, Exception ex) {
+	@Nullable
+	public ModelAndView resolveException(
+			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex) {
 
 		if (shouldApplyTo(request, handler)) {
-			// Log exception at debug log level
-			if (this.logger.isDebugEnabled()) {
-				this.logger.debug("Resolving exception from handler [" + handler + "]: " + ex);
-			}
 			prepareResponse(ex, response);
-			ModelAndView mav = doResolveException(request, response, handler, ex);
-			if (mav != null) {
-				// Log exception message at warn log level
+			ModelAndView result = doResolveException(request, response, handler, ex);
+			if (result != null) {
+				// Print debug message when warn logger is not enabled.
+				if (logger.isDebugEnabled() && (this.warnLogger == null || !this.warnLogger.isWarnEnabled())) {
+					logger.debug("Resolved [" + ex + "]" + (result.isEmpty() ? "" : " to " + result));
+				}
+				// Explicitly configured warn logger in logException method.
 				logException(ex, request);
 			}
-			return mav;
+			return result;
 		}
 		else {
 			return null;
@@ -145,8 +156,9 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 
 	/**
 	 * Check whether this resolver is supposed to apply to the given handler.
-	 * <p>The default implementation checks against the specified mapped handlers
-	 * and handler classes, if any.
+	 * <p>The default implementation checks against the configured
+	 * {@linkplain #setMappedHandlers handlers} and
+	 * {@linkplain #setMappedHandlerClasses handler classes}, if any.
 	 * @param request current HTTP request
 	 * @param handler the executed handler, or {@code null} if none chosen
 	 * at the time of the exception (for example, if multipart resolution failed)
@@ -155,7 +167,7 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 	 * @see #setMappedHandlers
 	 * @see #setMappedHandlerClasses
 	 */
-	protected boolean shouldApplyTo(HttpServletRequest request, Object handler) {
+	protected boolean shouldApplyTo(HttpServletRequest request, @Nullable Object handler) {
 		if (handler != null) {
 			if (this.mappedHandlers != null && this.mappedHandlers.contains(handler)) {
 				return true;
@@ -168,12 +180,21 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 				}
 			}
 		}
-		// Else only apply if there are no explicit handler mappings.
-		return (this.mappedHandlers == null && this.mappedHandlerClasses == null);
+		return !hasHandlerMappings();
 	}
 
 	/**
-	 * Log the given exception message at warn level.
+	 * Whether there are any handler mappings registered via
+	 * {@link #setMappedHandlers(Set)} or {@link #setMappedHandlerClasses(Class[])}.
+	 * @since 5.3
+	 */
+	protected boolean hasHandlerMappings() {
+		return (this.mappedHandlers != null || this.mappedHandlerClasses != null);
+	}
+
+	/**
+	 * Log the given exception at warn level, provided that warn logging has been
+	 * activated through the {@link #setWarnLogCategory "warnLogCategory"} property.
 	 * <p>Calls {@link #buildLogMessage} in order to determine the concrete message to log.
 	 * @param ex the exception that got thrown during handler execution
 	 * @param request current HTTP request (useful for obtaining metadata)
@@ -194,8 +215,7 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 	 * @return the log message to use
 	 */
 	protected String buildLogMessage(Exception ex, HttpServletRequest request) {
-		String message = (ex != null ? ex.getMessage() : "null");
-		return "Handler execution resulted in exception: " + (message != null ? message : "null");
+		return "Resolved [" + ex + "]";
 	}
 
 	/**
@@ -224,8 +244,8 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 
 
 	/**
-	 * Actually resolve the given exception that got thrown during on handler execution,
-	 * returning a ModelAndView that represents a specific error page if appropriate.
+	 * Actually resolve the given exception that got thrown during handler execution,
+	 * returning a {@link ModelAndView} that represents a specific error page if appropriate.
 	 * <p>May be overridden in subclasses, in order to apply specific exception checks.
 	 * Note that this template method will be invoked <i>after</i> checking whether this
 	 * resolved applies ("mappedHandlers" etc), so an implementation may simply proceed
@@ -235,9 +255,11 @@ public abstract class AbstractHandlerExceptionResolver implements HandlerExcepti
 	 * @param handler the executed handler, or {@code null} if none chosen at the time
 	 * of the exception (for example, if multipart resolution failed)
 	 * @param ex the exception that got thrown during handler execution
-	 * @return a corresponding ModelAndView to forward to, or {@code null} for default processing
+	 * @return a corresponding {@code ModelAndView} to forward to,
+	 * or {@code null} for default processing in the resolution chain
 	 */
-	protected abstract ModelAndView doResolveException(HttpServletRequest request,
-			HttpServletResponse response, Object handler, Exception ex);
+	@Nullable
+	protected abstract ModelAndView doResolveException(
+			HttpServletRequest request, HttpServletResponse response, @Nullable Object handler, Exception ex);
 
 }

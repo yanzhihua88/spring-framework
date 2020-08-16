@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,69 +18,71 @@ package org.springframework.web.context.request;
 
 import javax.servlet.ServletRequestEvent;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.core.task.MockRunnable;
-import org.springframework.mock.web.test.MockHttpServletRequest;
-import org.springframework.mock.web.test.MockServletContext;
+import org.springframework.web.testfixture.servlet.MockHttpServletRequest;
+import org.springframework.web.testfixture.servlet.MockServletContext;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Juergen Hoeller
  */
-public class RequestContextListenerTests extends TestCase {
+public class RequestContextListenerTests {
 
-	public void testRequestContextListenerWithSameThread() {
+	@Test
+	public void requestContextListenerWithSameThread() {
 		RequestContextListener listener = new RequestContextListener();
 		MockServletContext context = new MockServletContext();
 		MockHttpServletRequest request = new MockHttpServletRequest(context);
 		request.setAttribute("test", "value");
 
-		assertNull(RequestContextHolder.getRequestAttributes());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNull();
 		listener.requestInitialized(new ServletRequestEvent(context, request));
-		assertNotNull(RequestContextHolder.getRequestAttributes());
-		assertEquals("value",
-				RequestContextHolder.getRequestAttributes().getAttribute("test", RequestAttributes.SCOPE_REQUEST));
+		assertThat(RequestContextHolder.getRequestAttributes()).isNotNull();
+		assertThat(RequestContextHolder.getRequestAttributes().getAttribute("test", RequestAttributes.SCOPE_REQUEST)).isEqualTo("value");
 		MockRunnable runnable = new MockRunnable();
 		RequestContextHolder.getRequestAttributes().registerDestructionCallback(
 				"test", runnable, RequestAttributes.SCOPE_REQUEST);
 
 		listener.requestDestroyed(new ServletRequestEvent(context, request));
-		assertNull(RequestContextHolder.getRequestAttributes());
-		assertTrue(runnable.wasExecuted());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNull();
+		assertThat(runnable.wasExecuted()).isTrue();
 	}
 
-	public void testRequestContextListenerWithSameThreadAndAttributesGone() {
+	@Test
+	public void requestContextListenerWithSameThreadAndAttributesGone() {
 		RequestContextListener listener = new RequestContextListener();
 		MockServletContext context = new MockServletContext();
 		MockHttpServletRequest request = new MockHttpServletRequest(context);
 		request.setAttribute("test", "value");
 
-		assertNull(RequestContextHolder.getRequestAttributes());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNull();
 		listener.requestInitialized(new ServletRequestEvent(context, request));
-		assertNotNull(RequestContextHolder.getRequestAttributes());
-		assertEquals("value",
-				RequestContextHolder.getRequestAttributes().getAttribute("test", RequestAttributes.SCOPE_REQUEST));
+		assertThat(RequestContextHolder.getRequestAttributes()).isNotNull();
+		assertThat(RequestContextHolder.getRequestAttributes().getAttribute("test", RequestAttributes.SCOPE_REQUEST)).isEqualTo("value");
 		MockRunnable runnable = new MockRunnable();
 		RequestContextHolder.getRequestAttributes().registerDestructionCallback(
 				"test", runnable, RequestAttributes.SCOPE_REQUEST);
 
 		request.clearAttributes();
 		listener.requestDestroyed(new ServletRequestEvent(context, request));
-		assertNull(RequestContextHolder.getRequestAttributes());
-		assertTrue(runnable.wasExecuted());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNull();
+		assertThat(runnable.wasExecuted()).isTrue();
 	}
 
-	public void testRequestContextListenerWithDifferentThread() {
+	@Test
+	public void requestContextListenerWithDifferentThread() {
 		final RequestContextListener listener = new RequestContextListener();
 		final MockServletContext context = new MockServletContext();
 		final MockHttpServletRequest request = new MockHttpServletRequest(context);
 		request.setAttribute("test", "value");
 
-		assertNull(RequestContextHolder.getRequestAttributes());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNull();
 		listener.requestInitialized(new ServletRequestEvent(context, request));
-		assertNotNull(RequestContextHolder.getRequestAttributes());
-		assertEquals("value",
-				RequestContextHolder.getRequestAttributes().getAttribute("test", RequestAttributes.SCOPE_REQUEST));
+		assertThat(RequestContextHolder.getRequestAttributes()).isNotNull();
+		assertThat(RequestContextHolder.getRequestAttributes().getAttribute("test", RequestAttributes.SCOPE_REQUEST)).isEqualTo("value");
 		MockRunnable runnable = new MockRunnable();
 		RequestContextHolder.getRequestAttributes().registerDestructionCallback(
 				"test", runnable, RequestAttributes.SCOPE_REQUEST);
@@ -99,13 +101,13 @@ public class RequestContextListenerTests extends TestCase {
 		catch (InterruptedException ex) {
 		}
 		// Still bound to original thread, but at least completed.
-		assertNotNull(RequestContextHolder.getRequestAttributes());
-		assertTrue(runnable.wasExecuted());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNotNull();
+		assertThat(runnable.wasExecuted()).isTrue();
 
 		// Check that a repeated execution in the same thread works and performs cleanup.
 		listener.requestInitialized(new ServletRequestEvent(context, request));
 		listener.requestDestroyed(new ServletRequestEvent(context, request));
-		assertNull(RequestContextHolder.getRequestAttributes());
+		assertThat(RequestContextHolder.getRequestAttributes()).isNull();
 	}
 
 }

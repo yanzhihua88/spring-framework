@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,46 +18,48 @@ package org.springframework.beans.propertyeditors;
 
 import java.time.ZoneId;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Nicholas Williams
  */
-public class ZoneIdEditorTests extends TestCase {
+public class ZoneIdEditorTests {
 
-	public void testAmericaChicago() {
-		ZoneIdEditor editor = new ZoneIdEditor();
+	private final ZoneIdEditor editor = new ZoneIdEditor();
+
+	@Test
+	public void americaChicago() {
 		editor.setAsText("America/Chicago");
 
 		ZoneId zoneId = (ZoneId) editor.getValue();
-		assertNotNull("The zone ID should not be null.", zoneId);
-		assertEquals("The zone ID is not correct.", ZoneId.of("America/Chicago"), zoneId);
+		assertThat(zoneId).as("The zone ID should not be null.").isNotNull();
+		assertThat(zoneId).as("The zone ID is not correct.").isEqualTo(ZoneId.of("America/Chicago"));
 
-		assertEquals("The text version is not correct.", "America/Chicago", editor.getAsText());
+		assertThat(editor.getAsText()).as("The text version is not correct.").isEqualTo("America/Chicago");
 	}
 
-	public void testAmericaLosAngeles() {
-		ZoneIdEditor editor = new ZoneIdEditor();
+	@Test
+	public void americaLosAngeles() {
 		editor.setAsText("America/Los_Angeles");
 
 		ZoneId zoneId = (ZoneId) editor.getValue();
-		assertNotNull("The zone ID should not be null.", zoneId);
-		assertEquals("The zone ID is not correct.", ZoneId.of("America/Los_Angeles"), zoneId);
+		assertThat(zoneId).as("The zone ID should not be null.").isNotNull();
+		assertThat(zoneId).as("The zone ID is not correct.").isEqualTo(ZoneId.of("America/Los_Angeles"));
 
-		assertEquals("The text version is not correct.", "America/Los_Angeles", editor.getAsText());
+		assertThat(editor.getAsText()).as("The text version is not correct.").isEqualTo("America/Los_Angeles");
 	}
 
-	public void testGetNullAsText() {
-		ZoneIdEditor editor = new ZoneIdEditor();
-
-		assertEquals("The returned value is not correct.", "", editor.getAsText());
+	@Test
+	public void getNullAsText() {
+		assertThat(editor.getAsText()).as("The returned value is not correct.").isEqualTo("");
 	}
 
-	public void testGetValueAsText() {
-		ZoneIdEditor editor = new ZoneIdEditor();
+	@Test
+	public void getValueAsText() {
 		editor.setValue(ZoneId.of("America/New_York"));
-
-		assertEquals("The text version is not correct.", "America/New_York", editor.getAsText());
+		assertThat(editor.getAsText()).as("The text version is not correct.").isEqualTo("America/New_York");
 	}
 
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +18,16 @@ package org.springframework.context.event;
 
 import java.util.concurrent.Executor;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationListener;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.metrics.ApplicationStartup;
+import org.springframework.core.metrics.StartupStep;
+import org.springframework.lang.Nullable;
 import org.springframework.util.ErrorHandler;
 
 /**
@@ -40,13 +46,19 @@ import org.springframework.util.ErrorHandler;
  * @author Rod Johnson
  * @author Juergen Hoeller
  * @author Stephane Nicoll
+ * @author Brian Clozel
  * @see #setTaskExecutor
  */
 public class SimpleApplicationEventMulticaster extends AbstractApplicationEventMulticaster {
 
+	@Nullable
 	private Executor taskExecutor;
 
+	@Nullable
 	private ErrorHandler errorHandler;
+
+	@Nullable
+	private ApplicationStartup applicationStartup;
 
 
 	/**
@@ -75,13 +87,14 @@ public class SimpleApplicationEventMulticaster extends AbstractApplicationEventM
 	 * @see org.springframework.core.task.SyncTaskExecutor
 	 * @see org.springframework.core.task.SimpleAsyncTaskExecutor
 	 */
-	public void setTaskExecutor(Executor taskExecutor) {
+	public void setTaskExecutor(@Nullable Executor taskExecutor) {
 		this.taskExecutor = taskExecutor;
 	}
 
 	/**
 	 * Return the current task executor for this multicaster.
 	 */
+	@Nullable
 	protected Executor getTaskExecutor() {
 		return this.taskExecutor;
 	}
@@ -101,7 +114,7 @@ public class SimpleApplicationEventMulticaster extends AbstractApplicationEventM
 	 * (e.g. {@link org.springframework.scheduling.support.TaskUtils#LOG_AND_PROPAGATE_ERROR_HANDLER}).
 	 * @since 4.1
 	 */
-	public void setErrorHandler(ErrorHandler errorHandler) {
+	public void setErrorHandler(@Nullable ErrorHandler errorHandler) {
 		this.errorHandler = errorHandler;
 	}
 
@@ -109,10 +122,26 @@ public class SimpleApplicationEventMulticaster extends AbstractApplicationEventM
 	 * Return the current error handler for this multicaster.
 	 * @since 4.1
 	 */
+	@Nullable
 	protected ErrorHandler getErrorHandler() {
 		return this.errorHandler;
 	}
 
+	/**
+	 * Set the {@link ApplicationStartup} to track event listener invocations during startup.
+	 * @since 5.3
+	 */
+	public void setApplicationStartup(@Nullable ApplicationStartup applicationStartup) {
+		this.applicationStartup = applicationStartup;
+	}
+
+	/**
+	 * Return the current application startup for this multicaster.
+	 */
+	@Nullable
+	public ApplicationStartup getApplicationStartup() {
+		return this.applicationStartup;
+	}
 
 	@Override
 	public void multicastEvent(ApplicationEvent event) {
@@ -120,17 +149,22 @@ public class SimpleApplicationEventMulticaster extends AbstractApplicationEventM
 	}
 
 	@Override
-	public void multicastEvent(final ApplicationEvent event, ResolvableType eventType) {
+	public void multicastEvent(final ApplicationEvent event, @Nullable ResolvableType eventType) {
 		ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
-		for (final ApplicationListener<?> listener : getApplicationListeners(event, type)) {
-			Executor executor = getTaskExecutor();
+		Executor executor = getTaskExecutor();
+		for (ApplicationListener<?> listener : getApplicationListeners(event, type)) {
 			if (executor != null) {
-				executor.execute(new Runnable() {
-					@Override
-					public void run() {
-						invokeListener(listener, event);
-					}
-				});
+				executor.execute(() -> invokeListener(listener, event));
+			}
+			else if (this.applicationStartup != null) {
+				StartupStep invocationStep = this.applicationStartup.start("spring.event.invoke-listener");
+				invokeListener(listener, event);
+				invocationStep.tag("event", event::toString);
+				if (eventType != null) {
+					invocationStep.tag("eventType", eventType::toString);
+				}
+				invocationStep.tag("listener", listener::toString);
+				invocationStep.end();
 			}
 			else {
 				invokeListener(listener, event);
@@ -148,20 +182,58 @@ public class SimpleApplicationEventMulticaster extends AbstractApplicationEventM
 	 * @param event the current event to propagate
 	 * @since 4.1
 	 */
-	@SuppressWarnings({"unchecked", "rawtypes"})
-	protected void invokeListener(ApplicationListener listener, ApplicationEvent event) {
+	protected void invokeListener(ApplicationListener<?> listener, ApplicationEvent event) {
 		ErrorHandler errorHandler = getErrorHandler();
 		if (errorHandler != null) {
 			try {
-				listener.onApplicationEvent(event);
+				doInvokeListener(listener, event);
 			}
 			catch (Throwable err) {
 				errorHandler.handleError(err);
 			}
 		}
 		else {
+			doInvokeListener(listener, event);
+		}
+	}
+
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	private void doInvokeListener(ApplicationListener listener, ApplicationEvent event) {
+		try {
 			listener.onApplicationEvent(event);
 		}
+		catch (ClassCastException ex) {
+			String msg = ex.getMessage();
+			if (msg == null || matchesClassCastMessage(msg, event.getClass())) {
+				// Possibly a lambda-defined listener which we could not resolve the generic event type for
+				// -> let's suppress the exception and just log a debug message.
+				Log logger = LogFactory.getLog(getClass());
+				if (logger.isTraceEnabled()) {
+					logger.trace("Non-matching event type for listener: " + listener, ex);
+				}
+			}
+			else {
+				throw ex;
+			}
+		}
+	}
+
+	private boolean matchesClassCastMessage(String classCastMessage, Class<?> eventClass) {
+		// On Java 8, the message starts with the class name: "java.lang.String cannot be cast..."
+		if (classCastMessage.startsWith(eventClass.getName())) {
+			return true;
+		}
+		// On Java 11, the message starts with "class ..." a.k.a. Class.toString()
+		if (classCastMessage.startsWith(eventClass.toString())) {
+			return true;
+		}
+		// On Java 9, the message used to contain the module name: "java.base/java.lang.String cannot be cast..."
+		int moduleSeparatorIndex = classCastMessage.indexOf('/');
+		if (moduleSeparatorIndex != -1 && classCastMessage.startsWith(eventClass.getName(), moduleSeparatorIndex + 1)) {
+			return true;
+		}
+		// Assuming an unrelated class cast failure...
+		return false;
 	}
 
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,21 +16,25 @@
 
 package org.springframework.beans.factory.xml;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.support.BeanDefinitionReaderUtils;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.core.io.ClassPathResource;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * @author Rob Harrop
  * @author Juergen Hoeller
  */
-public class BeanNameGenerationTests extends TestCase {
+public class BeanNameGenerationTests {
 
 	private DefaultListableBeanFactory beanFactory;
 
-	@Override
+
+	@BeforeEach
 	public void setUp() {
 		this.beanFactory = new DefaultListableBeanFactory();
 		XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(this.beanFactory);
@@ -38,26 +42,27 @@ public class BeanNameGenerationTests extends TestCase {
 		reader.loadBeanDefinitions(new ClassPathResource("beanNameGeneration.xml", getClass()));
 	}
 
-	public void testNaming() {
+	@Test
+	public void naming() {
 		String className = GeneratedNameBean.class.getName();
 
 		String targetName = className + BeanDefinitionReaderUtils.GENERATED_BEAN_NAME_SEPARATOR + "0";
 		GeneratedNameBean topLevel1 = (GeneratedNameBean) beanFactory.getBean(targetName);
-		assertNotNull(topLevel1);
+		assertThat(topLevel1).isNotNull();
 
 		targetName = className + BeanDefinitionReaderUtils.GENERATED_BEAN_NAME_SEPARATOR + "1";
 		GeneratedNameBean topLevel2 = (GeneratedNameBean) beanFactory.getBean(targetName);
-		assertNotNull(topLevel2);
+		assertThat(topLevel2).isNotNull();
 
 		GeneratedNameBean child1 = topLevel1.getChild();
-		assertNotNull(child1.getBeanName());
-		assertTrue(child1.getBeanName().startsWith(className));
+		assertThat(child1.getBeanName()).isNotNull();
+		assertThat(child1.getBeanName().startsWith(className)).isTrue();
 
 		GeneratedNameBean child2 = topLevel2.getChild();
-		assertNotNull(child2.getBeanName());
-		assertTrue(child2.getBeanName().startsWith(className));
+		assertThat(child2.getBeanName()).isNotNull();
+		assertThat(child2.getBeanName().startsWith(className)).isTrue();
 
-		assertFalse(child1.getBeanName().equals(child2.getBeanName()));
+		assertThat(child1.getBeanName().equals(child2.getBeanName())).isFalse();
 	}
 
 }

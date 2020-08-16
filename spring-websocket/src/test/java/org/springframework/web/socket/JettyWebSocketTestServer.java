@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2016 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,13 +22,13 @@ import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.ServletContext;
 
+import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.NetworkConnector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
-import org.springframework.util.Assert;
-import org.springframework.util.SocketUtils;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
 
@@ -42,25 +42,19 @@ public class JettyWebSocketTestServer implements WebSocketTestServer {
 
 	private Server jettyServer;
 
-	private int port = -1;
+	private int port;
 
 	private ServletContextHandler contextHandler;
 
 
 	@Override
 	public void setup() {
-		this.port = SocketUtils.findAvailableTcpPort();
-		this.jettyServer = new Server(this.port);
-	}
-
-	@Override
-	public int getPort() {
-		return this.port;
+		// Let server pick its own random, available port.
+		this.jettyServer = new Server(0);
 	}
 
 	@Override
 	public void deployConfig(WebApplicationContext wac, Filter... filters) {
-		Assert.state(this.port != -1, "setup() was never called.");
 		ServletHolder servletHolder = new ServletHolder(new DispatcherServlet(wac));
 		this.contextHandler = new ServletContextHandler();
 		this.contextHandler.addServlet(servletHolder, "/");
@@ -75,11 +69,6 @@ public class JettyWebSocketTestServer implements WebSocketTestServer {
 	}
 
 	@Override
-	public ServletContext getServletContext() {
-		return this.contextHandler.getServletContext();
-	}
-
-	@Override
 	public void undeployConfig() {
 		// Stopping jetty will undeploy the servlet
 	}
@@ -87,14 +76,36 @@ public class JettyWebSocketTestServer implements WebSocketTestServer {
 	@Override
 	public void start() throws Exception {
 		this.jettyServer.start();
+		this.contextHandler.start();
+
+		Connector[] connectors = jettyServer.getConnectors();
+		NetworkConnector connector = (NetworkConnector) connectors[0];
+		this.port = connector.getLocalPort();
 	}
 
 	@Override
 	public void stop() throws Exception {
-		if (this.jettyServer.isRunning()) {
-			this.jettyServer.setStopTimeout(5000);
-			this.jettyServer.stop();
+		try {
+			if (this.contextHandler.isRunning()) {
+				this.contextHandler.stop();
+			}
 		}
+		finally {
+			if (this.jettyServer.isRunning()) {
+				this.jettyServer.setStopTimeout(5000);
+				this.jettyServer.stop();
+			}
+		}
+	}
+
+	@Override
+	public int getPort() {
+		return this.port;
+	}
+
+	@Override
+	public ServletContext getServletContext() {
+		return this.contextHandler.getServletContext();
 	}
 
 }

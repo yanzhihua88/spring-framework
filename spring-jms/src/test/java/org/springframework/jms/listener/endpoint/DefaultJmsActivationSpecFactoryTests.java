@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,46 +19,47 @@ package org.springframework.jms.listener.endpoint;
 import javax.jms.Destination;
 import javax.jms.Session;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.jca.StubResourceAdapter;
 import org.springframework.jms.StubQueue;
 import org.springframework.jms.support.destination.DestinationResolver;
 
-import static org.mockito.BDDMockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 /**
  * @author Agim Emruli
  * @author Juergen Hoeller
  */
-public class DefaultJmsActivationSpecFactoryTests extends TestCase {
+public class DefaultJmsActivationSpecFactoryTests {
 
-	private JmsActivationSpecConfig activationSpecConfig;
+	private final JmsActivationSpecConfig activationSpecConfig = new JmsActivationSpecConfig() {{
+		setMaxConcurrency(5);
+		setPrefetchSize(3);
+		setAcknowledgeMode(Session.AUTO_ACKNOWLEDGE);
+		setClientId("clientid");
+		setDestinationName("destinationname");
+		setDurableSubscriptionName("durableSubscriptionName");
+		setMessageSelector("selector");
+	}};
 
-	@Override
-	protected void setUp() throws Exception {
-		activationSpecConfig = new JmsActivationSpecConfig();
-		activationSpecConfig.setMaxConcurrency(5);
-		activationSpecConfig.setPrefetchSize(3);
-		activationSpecConfig.setAcknowledgeMode(Session.AUTO_ACKNOWLEDGE);
-		activationSpecConfig.setClientId("clientid");
-		activationSpecConfig.setDestinationName("destinationname");
-		activationSpecConfig.setDurableSubscriptionName("durableSubscriptionName");
-		activationSpecConfig.setMessageSelector("selector");
-	}
 
-	public void testActiveMQResourceAdapterSetup() {
+	@Test
+	public void activeMQResourceAdapterSetup() {
 		activationSpecConfig.setAcknowledgeMode(Session.SESSION_TRANSACTED);
 		JmsActivationSpecFactory activationSpecFactory = new DefaultJmsActivationSpecFactory();
 		StubActiveMQActivationSpec spec = (StubActiveMQActivationSpec) activationSpecFactory.createActivationSpec(
 				new StubActiveMQResourceAdapter(), activationSpecConfig);
 
-		assertEquals(5, spec.getMaxSessions());
-		assertEquals(3, spec.getMaxMessagesPerSessions());
-		assertTrue(spec.isUseRAManagedTransaction());
+		assertThat(spec.getMaxSessions()).isEqualTo(5);
+		assertThat(spec.getMaxMessagesPerSessions()).isEqualTo(3);
+		assertThat(spec.isUseRAManagedTransaction()).isTrue();
 	}
 
-	public void testWebSphereResourceAdapterSetup() throws Exception {
+	@Test
+	public void webSphereResourceAdapterSetup() throws Exception {
 		Destination destination = new StubQueue();
 
 		DestinationResolver destinationResolver = mock(DestinationResolver.class);
@@ -70,9 +71,9 @@ public class DefaultJmsActivationSpecFactoryTests extends TestCase {
 		StubWebSphereActivationSpecImpl spec = (StubWebSphereActivationSpecImpl) activationSpecFactory
 				.createActivationSpec(new StubWebSphereResourceAdapterImpl(), activationSpecConfig);
 
-		assertEquals(destination, spec.getDestination());
-		assertEquals(5, spec.getMaxConcurrency());
-		assertEquals(3, spec.getMaxBatchSize());
+		assertThat(spec.getDestination()).isEqualTo(destination);
+		assertThat(spec.getMaxConcurrency()).isEqualTo(5);
+		assertThat(spec.getMaxBatchSize()).isEqualTo(3);
 	}
 
 

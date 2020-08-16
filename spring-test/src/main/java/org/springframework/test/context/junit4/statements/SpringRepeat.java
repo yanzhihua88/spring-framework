@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,6 @@ import java.lang.reflect.Method;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.junit.runners.model.Statement;
 
 import org.springframework.test.annotation.TestAnnotationUtils;
@@ -30,9 +29,9 @@ import org.springframework.test.annotation.TestAnnotationUtils;
  * for Spring's {@link org.springframework.test.annotation.Repeat @Repeat}
  * annotation by repeating the test the specified number of times.
  *
- * @see #evaluate()
  * @author Sam Brannen
  * @since 3.0
+ * @see #evaluate()
  */
 public class SpringRepeat extends Statement {
 
@@ -49,7 +48,6 @@ public class SpringRepeat extends Statement {
 	 * Construct a new {@code SpringRepeat} statement for the supplied
 	 * {@code testMethod}, retrieving the configured repeat count from the
 	 * {@code @Repeat} annotation on the supplied method.
-	 *
 	 * @param next the next {@code Statement} in the execution chain
 	 * @param testMethod the current test method
 	 * @see TestAnnotationUtils#getRepeatCount(Method)
@@ -61,7 +59,6 @@ public class SpringRepeat extends Statement {
 	/**
 	 * Construct a new {@code SpringRepeat} statement for the supplied
 	 * {@code testMethod} and {@code repeat} count.
-	 *
 	 * @param next the next {@code Statement} in the execution chain
 	 * @param testMethod the current test method
 	 * @param repeat the configured repeat count for the current test method
@@ -72,6 +69,7 @@ public class SpringRepeat extends Statement {
 		this.repeat = Math.max(1, repeat);
 	}
 
+
 	/**
 	 * Evaluate the next {@link Statement statement} in the execution chain
 	 * repeatedly, using the specified repeat count.
@@ -81,7 +79,7 @@ public class SpringRepeat extends Statement {
 		for (int i = 0; i < this.repeat; i++) {
 			if (this.repeat > 1 && logger.isInfoEnabled()) {
 				logger.info(String.format("Repetition %d of test %s#%s()", (i + 1),
-					this.testMethod.getDeclaringClass().getSimpleName(), this.testMethod.getName()));
+						this.testMethod.getDeclaringClass().getSimpleName(), this.testMethod.getName()));
 			}
 			this.next.evaluate();
 		}

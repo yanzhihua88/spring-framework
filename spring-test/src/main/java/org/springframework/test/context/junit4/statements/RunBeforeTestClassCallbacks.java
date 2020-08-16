@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,10 +26,10 @@ import org.springframework.test.context.TestContextManager;
  * by calling {@link TestContextManager#beforeTestClass() beforeTestClass()} on the
  * supplied {@link TestContextManager}.
  *
- * @see #evaluate()
- * @see RunAfterTestMethodCallbacks
  * @author Sam Brannen
  * @since 3.0
+ * @see #evaluate()
+ * @see RunAfterTestMethodCallbacks
  */
 public class RunBeforeTestClassCallbacks extends Statement {
 
@@ -40,7 +40,6 @@ public class RunBeforeTestClassCallbacks extends Statement {
 
 	/**
 	 * Construct a new {@code RunBeforeTestClassCallbacks} statement.
-	 *
 	 * @param next the next {@code Statement} in the execution chain
 	 * @param testContextManager the TestContextManager upon which to call
 	 * {@code beforeTestClass()}
@@ -49,6 +48,7 @@ public class RunBeforeTestClassCallbacks extends Statement {
 		this.next = next;
 		this.testContextManager = testContextManager;
 	}
+
 
 	/**
 	 * Invoke {@link TestContextManager#beforeTestClass()} and then evaluate

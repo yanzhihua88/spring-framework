@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +20,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the conversion of Strings to {@link java.util.Properties} objects,
@@ -30,66 +32,72 @@ import junit.framework.TestCase;
  * @author Juergen Hoeller
  * @author Rick Evans
  */
-public class PropertiesEditorTests extends TestCase {
+public class PropertiesEditorTests {
 
-	public void testOneProperty() {
+	@Test
+	public void oneProperty() {
 		String s = "foo=bar";
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains one entry", p.entrySet().size() == 1);
-		assertTrue("foo=bar", p.get("foo").equals("bar"));
+		assertThat(p.entrySet().size() == 1).as("contains one entry").isTrue();
+		assertThat(p.get("foo").equals("bar")).as("foo=bar").isTrue();
 	}
 
-	public void testTwoProperties() {
+	@Test
+	public void twoProperties() {
 		String s = "foo=bar with whitespace\n" +
 			"me=mi";
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains two entries", p.entrySet().size() == 2);
-		assertTrue("foo=bar with whitespace", p.get("foo").equals("bar with whitespace"));
-		assertTrue("me=mi", p.get("me").equals("mi"));
+		assertThat(p.entrySet().size() == 2).as("contains two entries").isTrue();
+		assertThat(p.get("foo").equals("bar with whitespace")).as("foo=bar with whitespace").isTrue();
+		assertThat(p.get("me").equals("mi")).as("me=mi").isTrue();
 	}
 
-	public void testHandlesEqualsInValue() {
+	@Test
+	public void handlesEqualsInValue() {
 		String s = "foo=bar\n" +
 			"me=mi\n" +
 			"x=y=z";
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains two entries", p.entrySet().size() == 3);
-		assertTrue("foo=bar", p.get("foo").equals("bar"));
-		assertTrue("me=mi", p.get("me").equals("mi"));
-		assertTrue("x='y=z'", p.get("x").equals("y=z"));
+		assertThat(p.entrySet().size() == 3).as("contains two entries").isTrue();
+		assertThat(p.get("foo").equals("bar")).as("foo=bar").isTrue();
+		assertThat(p.get("me").equals("mi")).as("me=mi").isTrue();
+		assertThat(p.get("x").equals("y=z")).as("x='y=z'").isTrue();
 	}
 
-	public void testHandlesEmptyProperty() {
+	@Test
+	public void handlesEmptyProperty() {
 		String s = "foo=bar\nme=mi\nx=";
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains two entries", p.entrySet().size() == 3);
-		assertTrue("foo=bar", p.get("foo").equals("bar"));
-		assertTrue("me=mi", p.get("me").equals("mi"));
-		assertTrue("x='y=z'", p.get("x").equals(""));
+		assertThat(p.entrySet().size() == 3).as("contains two entries").isTrue();
+		assertThat(p.get("foo").equals("bar")).as("foo=bar").isTrue();
+		assertThat(p.get("me").equals("mi")).as("me=mi").isTrue();
+		assertThat(p.get("x").equals("")).as("x='y=z'").isTrue();
 	}
 
-	public void testHandlesEmptyPropertyWithoutEquals() {
+	@Test
+	public void handlesEmptyPropertyWithoutEquals() {
 		String s = "foo\nme=mi\nx=x";
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains three entries", p.entrySet().size() == 3);
-		assertTrue("foo is empty", p.get("foo").equals(""));
-		assertTrue("me=mi", p.get("me").equals("mi"));
+		assertThat(p.entrySet().size() == 3).as("contains three entries").isTrue();
+		assertThat(p.get("foo").equals("")).as("foo is empty").isTrue();
+		assertThat(p.get("me").equals("mi")).as("me=mi").isTrue();
 	}
 
 	/**
 	 * Comments begin with #
 	 */
-	public void testIgnoresCommentLinesAndEmptyLines() {
+	@Test
+	public void ignoresCommentLinesAndEmptyLines() {
 		String s = "#Ignore this comment\n" +
 			"foo=bar\n" +
 			"#Another=comment more junk /\n" +
@@ -99,9 +107,9 @@ public class PropertiesEditorTests extends TestCase {
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains three entries", p.entrySet().size() == 3);
-		assertTrue("foo is bar", p.get("foo").equals("bar"));
-		assertTrue("me=mi", p.get("me").equals("mi"));
+		assertThat(p.entrySet().size() == 3).as("contains three entries").isTrue();
+		assertThat(p.get("foo").equals("bar")).as("foo is bar").isTrue();
+		assertThat(p.get("me").equals("mi")).as("me=mi").isTrue();
 	}
 
 	/**
@@ -110,7 +118,8 @@ public class PropertiesEditorTests extends TestCase {
 	 * We must ensure that comment lines beginning with whitespace are
 	 * still ignored: The standard syntax doesn't allow this on JDK 1.3.
 	 */
-	public void testIgnoresLeadingSpacesAndTabs() {
+	@Test
+	public void ignoresLeadingSpacesAndTabs() {
 		String s = "    #Ignore this comment\n" +
 			"\t\tfoo=bar\n" +
 			"\t#Another comment more junk \n" +
@@ -120,40 +129,44 @@ public class PropertiesEditorTests extends TestCase {
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(s);
 		Properties p = (Properties) pe.getValue();
-		assertTrue("contains 3 entries, not " + p.size(), p.size() == 3);
-		assertTrue("foo is bar", p.get("foo").equals("bar"));
-		assertTrue("me=mi", p.get("me").equals("mi"));
+		assertThat(p.size() == 3).as("contains 3 entries, not " + p.size()).isTrue();
+		assertThat(p.get("foo").equals("bar")).as("foo is bar").isTrue();
+		assertThat(p.get("me").equals("mi")).as("me=mi").isTrue();
 	}
 
-	public void testNull() {
+	@Test
+	public void nullValue() {
 		PropertiesEditor pe= new PropertiesEditor();
 		pe.setAsText(null);
 		Properties p = (Properties) pe.getValue();
-		assertEquals(0, p.size());
+		assertThat(p.size()).isEqualTo(0);
 	}
 
-	public void testEmptyString() {
+	@Test
+	public void emptyString() {
 		PropertiesEditor pe = new PropertiesEditor();
 		pe.setAsText("");
 		Properties p = (Properties) pe.getValue();
-		assertTrue("empty string means empty properties", p.isEmpty());
+		assertThat(p.isEmpty()).as("empty string means empty properties").isTrue();
 	}
 
-	public void testUsingMapAsValueSource() throws Exception {
-		Map map = new HashMap();
+	@Test
+	public void usingMapAsValueSource() throws Exception {
+		Map<String, String> map = new HashMap<>();
 		map.put("one", "1");
 		map.put("two", "2");
 		map.put("three", "3");
 		PropertiesEditor pe = new PropertiesEditor();
 		pe.setValue(map);
 		Object value = pe.getValue();
-		assertNotNull(value);
-		assertTrue(value instanceof Properties);
+		assertThat(value).isNotNull();
+		boolean condition = value instanceof Properties;
+		assertThat(condition).isTrue();
 		Properties props = (Properties) value;
-		assertEquals(3, props.size());
-		assertEquals("1", props.getProperty("one"));
-		assertEquals("2", props.getProperty("two"));
-		assertEquals("3", props.getProperty("three"));
+		assertThat(props.size()).isEqualTo(3);
+		assertThat(props.getProperty("one")).isEqualTo("1");
+		assertThat(props.getProperty("two")).isEqualTo("2");
+		assertThat(props.getProperty("three")).isEqualTo("3");
 	}
 
 }

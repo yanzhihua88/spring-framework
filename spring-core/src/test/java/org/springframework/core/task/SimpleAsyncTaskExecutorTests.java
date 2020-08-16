@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,42 +18,48 @@ package org.springframework.core.task;
 
 import java.util.concurrent.ThreadFactory;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.util.ConcurrencyThrottleSupport;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 /**
  * @author Rick Evans
  * @author Juergen Hoeller
+ * @author Sam Brannen
  */
-public final class SimpleAsyncTaskExecutorTests extends TestCase {
+class SimpleAsyncTaskExecutorTests {
 
-	public void testCannotExecuteWhenConcurrencyIsSwitchedOff() throws Exception {
+	@Test
+	void cannotExecuteWhenConcurrencyIsSwitchedOff() throws Exception {
 		SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor();
 		executor.setConcurrencyLimit(ConcurrencyThrottleSupport.NO_CONCURRENCY);
-		assertFalse(executor.isThrottleActive());
-		try {
-			executor.execute(new NoOpRunnable());
-		}
-		catch (IllegalStateException expected) {
-		}
+		assertThat(executor.isThrottleActive()).isTrue();
+		assertThatIllegalStateException().isThrownBy(() ->
+				executor.execute(new NoOpRunnable()));
 	}
 
-	public void testThrottleIsNotActiveByDefault() throws Exception {
+	@Test
+	void throttleIsNotActiveByDefault() throws Exception {
 		SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor();
-		assertFalse("Concurrency throttle must not default to being active (on)", executor.isThrottleActive());
+		assertThat(executor.isThrottleActive()).as("Concurrency throttle must not default to being active (on)").isFalse();
 	}
 
-	public void testThreadNameGetsSetCorrectly() throws Exception {
+	@Test
+	void threadNameGetsSetCorrectly() throws Exception {
 		final String customPrefix = "chankPop#";
 		final Object monitor = new Object();
 		SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor(customPrefix);
 		ThreadNameHarvester task = new ThreadNameHarvester(monitor);
 		executeAndWait(executor, task, monitor);
-		assertTrue(task.getThreadName().startsWith(customPrefix));
+		assertThat(task.getThreadName()).startsWith(customPrefix);
 	}
 
-	public void testThreadFactoryOverridesDefaults() throws Exception {
+	@Test
+	void threadFactoryOverridesDefaults() throws Exception {
 		final Object monitor = new Object();
 		SimpleAsyncTaskExecutor executor = new SimpleAsyncTaskExecutor(new ThreadFactory() {
 			@Override
@@ -63,16 +69,13 @@ public final class SimpleAsyncTaskExecutorTests extends TestCase {
 		});
 		ThreadNameHarvester task = new ThreadNameHarvester(monitor);
 		executeAndWait(executor, task, monitor);
-		assertTrue(task.getThreadName().equals("test"));
+		assertThat(task.getThreadName()).isEqualTo("test");
 	}
 
-	public void testThrowsExceptionWhenSuppliedWithNullRunnable() throws Exception {
-		try {
-			new SimpleAsyncTaskExecutor().execute(null);
-			fail("Should have thrown IllegalArgumentException");
-		}
-		catch (IllegalArgumentException expected) {
-		}
+	@Test
+	void throwsExceptionWhenSuppliedWithNullRunnable() throws Exception {
+		assertThatIllegalArgumentException().isThrownBy(() ->
+				new SimpleAsyncTaskExecutor().execute(null));
 	}
 
 	private void executeAndWait(SimpleAsyncTaskExecutor executor, Runnable task, Object monitor) {

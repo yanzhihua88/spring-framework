@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@ import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.http.server.ServletServerHttpResponse;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.web.HttpRequestHandler;
 import org.springframework.web.context.ServletContextAware;
@@ -57,7 +58,7 @@ public class SockJsHttpRequestHandler
 
 	private final WebSocketHandler webSocketHandler;
 
-	private volatile boolean running = false;
+	private volatile boolean running;
 
 
 	/**
@@ -66,8 +67,8 @@ public class SockJsHttpRequestHandler
 	 * @param webSocketHandler the websocket handler
 	 */
 	public SockJsHttpRequestHandler(SockJsService sockJsService, WebSocketHandler webSocketHandler) {
-		Assert.notNull(sockJsService, "sockJsService must not be null");
-		Assert.notNull(webSocketHandler, "webSocketHandler must not be null");
+		Assert.notNull(sockJsService, "SockJsService must not be null");
+		Assert.notNull(webSocketHandler, "WebSocketHandler must not be null");
 		this.sockJsService = sockJsService;
 		this.webSocketHandler =
 				new ExceptionWebSocketHandlerDecorator(new LoggingWebSocketHandlerDecorator(webSocketHandler));
@@ -95,10 +96,6 @@ public class SockJsHttpRequestHandler
 		}
 	}
 
-	@Override
-	public boolean isRunning() {
-		return this.running;
-	}
 
 	@Override
 	public void start() {
@@ -120,6 +117,11 @@ public class SockJsHttpRequestHandler
 		}
 	}
 
+	@Override
+	public boolean isRunning() {
+		return this.running;
+	}
+
 
 	@Override
 	public void handleRequest(HttpServletRequest servletRequest, HttpServletResponse servletResponse)
@@ -131,7 +133,7 @@ public class SockJsHttpRequestHandler
 		try {
 			this.sockJsService.handleRequest(request, response, getSockJsPath(servletRequest), this.webSocketHandler);
 		}
-		catch (Throwable ex) {
+		catch (Exception ex) {
 			throw new SockJsException("Uncaught failure in SockJS request, uri=" + request.getURI(), ex);
 		}
 	}
@@ -139,13 +141,14 @@ public class SockJsHttpRequestHandler
 	private String getSockJsPath(HttpServletRequest servletRequest) {
 		String attribute = HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE;
 		String path = (String) servletRequest.getAttribute(attribute);
-		return ((path.length() > 0) && (path.charAt(0) != '/')) ? "/" + path : path;
+		return (path.length() > 0 && path.charAt(0) != '/' ? "/" + path : path);
 	}
 
 	@Override
+	@Nullable
 	public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
-		if (sockJsService instanceof CorsConfigurationSource) {
-			return ((CorsConfigurationSource)sockJsService).getCorsConfiguration(request);
+		if (this.sockJsService instanceof CorsConfigurationSource) {
+			return ((CorsConfigurationSource) this.sockJsService).getCorsConfiguration(request);
 		}
 		return null;
 	}

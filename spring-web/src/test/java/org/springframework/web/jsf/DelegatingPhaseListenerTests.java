@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,65 +21,63 @@ import javax.faces.event.PhaseEvent;
 import javax.faces.event.PhaseId;
 import javax.faces.event.PhaseListener;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Colin Sampaleanu
  * @author Juergen Hoeller
  */
-public class DelegatingPhaseListenerTests extends TestCase {
+public class DelegatingPhaseListenerTests {
 
-	private MockFacesContext facesContext;
-	private StaticListableBeanFactory beanFactory;
-	private DelegatingPhaseListenerMulticaster delPhaseListener;
+	private final MockFacesContext facesContext = new MockFacesContext();
 
-	@Override
+	private final StaticListableBeanFactory beanFactory = new StaticListableBeanFactory();
+
 	@SuppressWarnings("serial")
-	protected void setUp() {
-		facesContext = new MockFacesContext();
-		beanFactory = new StaticListableBeanFactory();
+	private final DelegatingPhaseListenerMulticaster delPhaseListener = new DelegatingPhaseListenerMulticaster() {
+		@Override
+		protected ListableBeanFactory getBeanFactory(FacesContext facesContext) {
+			return beanFactory;
+		}
+	};
 
-		delPhaseListener = new DelegatingPhaseListenerMulticaster() {
-			@Override
-			protected ListableBeanFactory getBeanFactory(FacesContext facesContext) {
-				return beanFactory;
-			}
-		};
-	}
-
-	public void testBeforeAndAfterPhaseWithSingleTarget() {
+	@Test
+	public void beforeAndAfterPhaseWithSingleTarget() {
 		TestListener target = new TestListener();
 		beanFactory.addBean("testListener", target);
 
-		assertEquals(delPhaseListener.getPhaseId(), PhaseId.ANY_PHASE);
+		assertThat((Object) delPhaseListener.getPhaseId()).isEqualTo(PhaseId.ANY_PHASE);
 		PhaseEvent event = new PhaseEvent(facesContext, PhaseId.INVOKE_APPLICATION, new MockLifecycle());
 
 		delPhaseListener.beforePhase(event);
-		assertTrue(target.beforeCalled);
+		assertThat(target.beforeCalled).isTrue();
 
 		delPhaseListener.afterPhase(event);
-		assertTrue(target.afterCalled);
+		assertThat(target.afterCalled).isTrue();
 	}
 
-	public void testBeforeAndAfterPhaseWithMultipleTargets() {
+	@Test
+	public void beforeAndAfterPhaseWithMultipleTargets() {
 		TestListener target1 = new TestListener();
 		TestListener target2 = new TestListener();
 		beanFactory.addBean("testListener1", target1);
 		beanFactory.addBean("testListener2", target2);
 
-		assertEquals(delPhaseListener.getPhaseId(), PhaseId.ANY_PHASE);
+		assertThat((Object) delPhaseListener.getPhaseId()).isEqualTo(PhaseId.ANY_PHASE);
 		PhaseEvent event = new PhaseEvent(facesContext, PhaseId.INVOKE_APPLICATION, new MockLifecycle());
 
 		delPhaseListener.beforePhase(event);
-		assertTrue(target1.beforeCalled);
-		assertTrue(target2.beforeCalled);
+		assertThat(target1.beforeCalled).isTrue();
+		assertThat(target2.beforeCalled).isTrue();
 
 		delPhaseListener.afterPhase(event);
-		assertTrue(target1.afterCalled);
-		assertTrue(target2.afterCalled);
+		assertThat(target1.afterCalled).isTrue();
+		assertThat(target2.afterCalled).isTrue();
 	}
 
 

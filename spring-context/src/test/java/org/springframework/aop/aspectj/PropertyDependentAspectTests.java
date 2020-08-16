@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,13 +20,13 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.aop.framework.Advised;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Check that an aspect that depends on another bean, where the referenced bean
@@ -36,48 +36,54 @@ import static org.junit.Assert.*;
  * @author Juergen Hoeller
  * @author Chris Beams
  */
-public final class PropertyDependentAspectTests {
+@SuppressWarnings("resource")
+public class PropertyDependentAspectTests {
 
 	@Test
-	public void testPropertyDependentAspectWithPropertyDeclaredBeforeAdvice() throws Exception {
+	public void propertyDependentAspectWithPropertyDeclaredBeforeAdvice()
+			throws Exception {
 		checkXmlAspect(getClass().getSimpleName() + "-before.xml");
 	}
 
 	@Test
-	public void testPropertyDependentAspectWithPropertyDeclaredAfterAdvice() throws Exception {
+	public void propertyDependentAspectWithPropertyDeclaredAfterAdvice() throws Exception {
 		checkXmlAspect(getClass().getSimpleName() + "-after.xml");
 	}
 
 	@Test
-	public void testPropertyDependentAtAspectJAspectWithPropertyDeclaredBeforeAdvice() throws Exception {
+	public void propertyDependentAtAspectJAspectWithPropertyDeclaredBeforeAdvice()
+			throws Exception {
 		checkAtAspectJAspect(getClass().getSimpleName() + "-atAspectJ-before.xml");
 	}
 
 	@Test
-	public void testPropertyDependentAtAspectJAspectWithPropertyDeclaredAfterAdvice() throws Exception {
+	public void propertyDependentAtAspectJAspectWithPropertyDeclaredAfterAdvice()
+			throws Exception {
 		checkAtAspectJAspect(getClass().getSimpleName() + "-atAspectJ-after.xml");
 	}
 
 	private void checkXmlAspect(String appContextFile) {
 		ApplicationContext context = new ClassPathXmlApplicationContext(appContextFile, getClass());
 		ICounter counter = (ICounter) context.getBean("counter");
-		assertTrue("Proxy didn't get created", counter instanceof Advised);
+		boolean condition = counter instanceof Advised;
+		assertThat(condition).as("Proxy didn't get created").isTrue();
 
 		counter.increment();
 		JoinPointMonitorAspect callCountingAspect = (JoinPointMonitorAspect)context.getBean("monitoringAspect");
-		assertEquals("Advise didn't get executed", 1, callCountingAspect.beforeExecutions);
-		assertEquals("Advise didn't get executed", 1, callCountingAspect.aroundExecutions);
+		assertThat(callCountingAspect.beforeExecutions).as("Advise didn't get executed").isEqualTo(1);
+		assertThat(callCountingAspect.aroundExecutions).as("Advise didn't get executed").isEqualTo(1);
 	}
 
 	private void checkAtAspectJAspect(String appContextFile) {
 		ApplicationContext context = new ClassPathXmlApplicationContext(appContextFile, getClass());
 		ICounter counter = (ICounter) context.getBean("counter");
-		assertTrue("Proxy didn't get created", counter instanceof Advised);
+		boolean condition = counter instanceof Advised;
+		assertThat(condition).as("Proxy didn't get created").isTrue();
 
 		counter.increment();
 		JoinPointMonitorAtAspectJAspect callCountingAspect = (JoinPointMonitorAtAspectJAspect)context.getBean("monitoringAspect");
-		assertEquals("Advise didn't get executed", 1, callCountingAspect.beforeExecutions);
-		assertEquals("Advise didn't get executed", 1, callCountingAspect.aroundExecutions);
+		assertThat(callCountingAspect.beforeExecutions).as("Advise didn't get executed").isEqualTo(1);
+		assertThat(callCountingAspect.aroundExecutions).as("Advise didn't get executed").isEqualTo(1);
 	}
 
 }

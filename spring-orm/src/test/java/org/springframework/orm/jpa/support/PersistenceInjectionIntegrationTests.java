@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,44 +16,37 @@
 
 package org.springframework.orm.jpa.support;
 
-import javax.persistence.EntityManager;
+import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.orm.jpa.AbstractEntityManagerFactoryIntegrationTests;
 import org.springframework.orm.jpa.support.PersistenceInjectionTests.DefaultPublicPersistenceContextSetter;
 import org.springframework.orm.jpa.support.PersistenceInjectionTests.DefaultPublicPersistenceUnitSetterNamedPerson;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * @author Rod Johnson
  * @author Juergen Hoeller
+ * @author Sam Brannen
  */
-@SuppressWarnings("deprecation")
 public class PersistenceInjectionIntegrationTests extends AbstractEntityManagerFactoryIntegrationTests {
 
 	@Autowired
 	private DefaultPublicPersistenceContextSetter defaultSetterInjected;
 
+	@Autowired
 	private DefaultPublicPersistenceUnitSetterNamedPerson namedSetterInjected;
 
 
-	public PersistenceInjectionIntegrationTests() {
-		setAutowireMode(AUTOWIRE_NO);
-		setDependencyCheck(false);
+	@Test
+	public void testDefaultPersistenceContextSetterInjection() {
+		assertThat(defaultSetterInjected.getEntityManager()).isNotNull();
 	}
 
-	@Autowired
-	private void init(DefaultPublicPersistenceUnitSetterNamedPerson namedSetterInjected) {
-		this.namedSetterInjected = namedSetterInjected;
-	}
-
-
-	public void testDefaultSetterInjection() {
-		EntityManager injectedEm = defaultSetterInjected.getEntityManager();
-		assertNotNull("Default PersistenceContext Setter was injected", injectedEm);
-	}
-
+	@Test
 	public void testSetterInjectionOfNamedPersistenceContext() {
-		assertNotNull("Named PersistenceContext Setter was injected", namedSetterInjected.getEntityManagerFactory());
+		assertThat(namedSetterInjected.getEntityManagerFactory()).isNotNull();
 	}
 
 }

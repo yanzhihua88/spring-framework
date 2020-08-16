@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -35,9 +35,9 @@ import org.springframework.util.Assert;
  * the next {@code statement} will be executed in the same thread as the
  * caller and will therefore not be aborted preemptively.
  *
- * @see #evaluate()
  * @author Sam Brannen
  * @since 3.0
+ * @see #evaluate()
  */
 public class SpringFailOnTimeout extends Statement {
 
@@ -50,7 +50,6 @@ public class SpringFailOnTimeout extends Statement {
 	 * Construct a new {@code SpringFailOnTimeout} statement for the supplied
 	 * {@code testMethod}, retrieving the configured timeout from the
 	 * {@code @Timed} annotation on the supplied method.
-	 *
 	 * @param next the next {@code Statement} in the execution chain
 	 * @param testMethod the current test method
 	 * @see TestAnnotationUtils#getTimeout(Method)
@@ -64,7 +63,6 @@ public class SpringFailOnTimeout extends Statement {
 	 * {@code timeout}.
 	 * <p>If the supplied {@code timeout} is {@code 0}, the execution of the
 	 * {@code next} statement will not be timed.
-	 *
 	 * @param next the next {@code Statement} in the execution chain; never {@code null}
 	 * @param timeout the configured {@code timeout} for the current test, in milliseconds;
 	 * never negative
@@ -75,6 +73,7 @@ public class SpringFailOnTimeout extends Statement {
 		this.next = next;
 		this.timeout = timeout;
 	}
+
 
 	/**
 	 * Evaluate the next {@link Statement statement} in the execution chain
@@ -89,15 +88,11 @@ public class SpringFailOnTimeout extends Statement {
 		}
 		else {
 			long startTime = System.currentTimeMillis();
-			try {
-				this.next.evaluate();
-			}
-			finally {
-				long elapsed = System.currentTimeMillis() - startTime;
-				if (elapsed > this.timeout) {
-					throw new TimeoutException(
+			this.next.evaluate();
+			long elapsed = System.currentTimeMillis() - startTime;
+			if (elapsed > this.timeout) {
+				throw new TimeoutException(
 						String.format("Test took %s ms; limit was %s ms.", elapsed, this.timeout));
-				}
 			}
 		}
 	}

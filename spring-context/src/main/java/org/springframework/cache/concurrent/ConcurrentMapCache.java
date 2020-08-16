@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,18 @@
 
 package org.springframework.cache.concurrent;
 
-import java.io.Serializable;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import org.springframework.cache.Cache;
-import org.springframework.cache.support.SimpleValueWrapper;
+import org.springframework.cache.support.AbstractValueAdaptingCache;
+import org.springframework.core.serializer.support.SerializationDelegate;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
- * Simple {@link Cache} implementation based on the core JDK
- * {@code java.util.concurrent} package.
+ * Simple {@link org.springframework.cache.Cache} implementation based on the
+ * core JDK {@code java.util.concurrent} package.
  *
  * <p>Useful for testing or simple caching scenarios, typically in combination
  * with {@link org.springframework.cache.support.SimpleCacheManager} or
@@ -39,17 +40,18 @@ import org.springframework.util.Assert;
  *
  * @author Costin Leau
  * @author Juergen Hoeller
+ * @author Stephane Nicoll
  * @since 3.1
+ * @see ConcurrentMapCacheManager
  */
-public class ConcurrentMapCache implements Cache {
-
-	private static final Object NULL_HOLDER = new NullHolder();
+public class ConcurrentMapCache extends AbstractValueAdaptingCache {
 
 	private final String name;
 
 	private final ConcurrentMap<Object, Object> store;
 
-	private final boolean allowNullValues;
+	@Nullable
+	private final SerializationDelegate serialization;
 
 
 	/**
@@ -57,7 +59,7 @@ public class ConcurrentMapCache implements Cache {
 	 * @param name the name of the cache
 	 */
 	public ConcurrentMapCache(String name) {
-		this(name, new ConcurrentHashMap<Object, Object>(256), true);
+		this(name, new ConcurrentHashMap<>(256), true);
 	}
 
 	/**
@@ -67,7 +69,7 @@ public class ConcurrentMapCache implements Cache {
 	 * values for this cache
 	 */
 	public ConcurrentMapCache(String name, boolean allowNullValues) {
-		this(name, new ConcurrentHashMap<Object, Object>(256), allowNullValues);
+		this(name, new ConcurrentHashMap<>(256), allowNullValues);
 	}
 
 	/**
@@ -79,13 +81,43 @@ public class ConcurrentMapCache implements Cache {
 	 * (adapting them to an internal null holder value)
 	 */
 	public ConcurrentMapCache(String name, ConcurrentMap<Object, Object> store, boolean allowNullValues) {
+		this(name, store, allowNullValues, null);
+	}
+
+	/**
+	 * Create a new ConcurrentMapCache with the specified name and the
+	 * given internal {@link ConcurrentMap} to use. If the
+	 * {@link SerializationDelegate} is specified,
+	 * {@link #isStoreByValue() store-by-value} is enabled
+	 * @param name the name of the cache
+	 * @param store the ConcurrentMap to use as an internal store
+	 * @param allowNullValues whether to allow {@code null} values
+	 * (adapting them to an internal null holder value)
+	 * @param serialization the {@link SerializationDelegate} to use
+	 * to serialize cache entry or {@code null} to store the reference
+	 * @since 4.3
+	 */
+	protected ConcurrentMapCache(String name, ConcurrentMap<Object, Object> store,
+			boolean allowNullValues, @Nullable SerializationDelegate serialization) {
+
+		super(allowNullValues);
 		Assert.notNull(name, "Name must not be null");
 		Assert.notNull(store, "Store must not be null");
 		this.name = name;
 		this.store = store;
-		this.allowNullValues = allowNullValues;
+		this.serialization = serialization;
 	}
 
+
+	/**
+	 * Return whether this cache stores a copy of each entry ({@code true}) or
+	 * a reference ({@code false}, default). If store by value is enabled, each
+	 * entry in the cache must be serializable.
+	 * @since 4.3
+	 */
+	public final boolean isStoreByValue() {
+		return (this.serialization != null);
+	}
 
 	@Override
 	public final String getName() {
@@ -97,35 +129,36 @@ public class ConcurrentMapCache implements Cache {
 		return this.store;
 	}
 
-	public final boolean isAllowNullValues() {
-		return this.allowNullValues;
+	@Override
+	@Nullable
+	protected Object lookup(Object key) {
+		return this.store.get(key);
 	}
 
-	@Override
-	public ValueWrapper get(Object key) {
-		Object value = this.store.get(key);
-		return toWrapper(value);
-	}
-
-	@Override
 	@SuppressWarnings("unchecked")
-	public <T> T get(Object key, Class<T> type) {
-		Object value = fromStoreValue(this.store.get(key));
-		if (value != null && type != null && !type.isInstance(value)) {
-			throw new IllegalStateException("Cached value is not of required type [" + type.getName() + "]: " + value);
-		}
-		return (T) value;
+	@Override
+	@Nullable
+	public <T> T get(Object key, Callable<T> valueLoader) {
+		return (T) fromStoreValue(this.store.computeIfAbsent(key, k -> {
+			try {
+				return toStoreValue(valueLoader.call());
+			}
+			catch (Throwable ex) {
+				throw new ValueRetrievalException(key, valueLoader, ex);
+			}
+		}));
 	}
 
 	@Override
-	public void put(Object key, Object value) {
+	public void put(Object key, @Nullable Object value) {
 		this.store.put(key, toStoreValue(value));
 	}
 
 	@Override
-	public ValueWrapper putIfAbsent(Object key, Object value) {
-		Object existing = this.store.putIfAbsent(key, value);
-		return toWrapper(existing);
+	@Nullable
+	public ValueWrapper putIfAbsent(Object key, @Nullable Object value) {
+		Object existing = this.store.putIfAbsent(key, toStoreValue(value));
+		return toValueWrapper(existing);
 	}
 
 	@Override
@@ -134,43 +167,52 @@ public class ConcurrentMapCache implements Cache {
 	}
 
 	@Override
+	public boolean evictIfPresent(Object key) {
+		return (this.store.remove(key) != null);
+	}
+
+	@Override
 	public void clear() {
 		this.store.clear();
 	}
 
+	@Override
+	public boolean invalidate() {
+		boolean notEmpty = !this.store.isEmpty();
+		this.store.clear();
+		return notEmpty;
+	}
 
-	/**
-	 * Convert the given value from the internal store to a user value
-	 * returned from the get method (adapting {@code null}).
-	 * @param storeValue the store value
-	 * @return the value to return to the user
-	 */
-	protected Object fromStoreValue(Object storeValue) {
-		if (this.allowNullValues && storeValue == NULL_HOLDER) {
-			return null;
+	@Override
+	protected Object toStoreValue(@Nullable Object userValue) {
+		Object storeValue = super.toStoreValue(userValue);
+		if (this.serialization != null) {
+			try {
+				return this.serialization.serializeToByteArray(storeValue);
+			}
+			catch (Throwable ex) {
+				throw new IllegalArgumentException("Failed to serialize cache value '" + userValue +
+						"'. Does it implement Serializable?", ex);
+			}
 		}
-		return storeValue;
-	}
-
-	/**
-	 * Convert the given user value, as passed into the put method,
-	 * to a value in the internal store (adapting {@code null}).
-	 * @param userValue the given user value
-	 * @return the value to store
-	 */
-	protected Object toStoreValue(Object userValue) {
-		if (this.allowNullValues && userValue == null) {
-			return NULL_HOLDER;
+		else {
+			return storeValue;
 		}
-		return userValue;
 	}
 
-	private ValueWrapper toWrapper(Object value) {
-		return (value != null ? new SimpleValueWrapper(fromStoreValue(value)) : null);
-	}
-
-	@SuppressWarnings("serial")
-	private static class NullHolder implements Serializable {
+	@Override
+	protected Object fromStoreValue(@Nullable Object storeValue) {
+		if (storeValue != null && this.serialization != null) {
+			try {
+				return super.fromStoreValue(this.serialization.deserializeFromByteArray((byte[]) storeValue));
+			}
+			catch (Throwable ex) {
+				throw new IllegalArgumentException("Failed to deserialize cache value '" + storeValue + "'", ex);
+			}
+		}
+		else {
+			return super.fromStoreValue(storeValue);
+		}
 	}
 
 }

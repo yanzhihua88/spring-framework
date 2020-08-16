@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,7 @@
 package org.springframework.web.socket.server.support;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,8 +33,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.socket.SubProtocolCapable;
 import org.springframework.web.socket.WebSocketExtension;
@@ -46,53 +48,66 @@ import org.springframework.web.socket.server.HandshakeHandler;
 import org.springframework.web.socket.server.RequestUpgradeStrategy;
 
 /**
- * A base class to use for {@link HandshakeHandler} implementations.
- * Performs initial validation of the WebSocket handshake request -- possibly rejecting it
- * through the appropriate HTTP status code -- while also allowing sub-classes to override
+ * A base class for {@link HandshakeHandler} implementations, independent from the Servlet API.
+ *
+ * <p>Performs initial validation of the WebSocket handshake request - possibly rejecting it
+ * through the appropriate HTTP status code - while also allowing its subclasses to override
  * various parts of the negotiation process (e.g. origin validation, sub-protocol negotiation,
  * extensions negotiation, etc).
  *
  * <p>If the negotiation succeeds, the actual upgrade is delegated to a server-specific
- * {@link RequestUpgradeStrategy}, which will update
+ * {@link org.springframework.web.socket.server.RequestUpgradeStrategy}, which will update
  * the response as necessary and initialize the WebSocket. Currently supported servers are
- * Tomcat 7 and 8, Jetty 9, and GlassFish 4.
+ * Jetty 9.0-9.3, Tomcat 7.0.47+ and 8.x, Undertow 1.0-1.3, GlassFish 4.1+, WebLogic 12.1.3+.
  *
  * @author Rossen Stoyanchev
- * @since 4.0
+ * @author Juergen Hoeller
+ * @since 4.2
+ * @see org.springframework.web.socket.server.jetty.JettyRequestUpgradeStrategy
+ * @see org.springframework.web.socket.server.standard.TomcatRequestUpgradeStrategy
+ * @see org.springframework.web.socket.server.standard.UndertowRequestUpgradeStrategy
+ * @see org.springframework.web.socket.server.standard.GlassFishRequestUpgradeStrategy
+ * @see org.springframework.web.socket.server.standard.WebLogicRequestUpgradeStrategy
  */
 public abstract class AbstractHandshakeHandler implements HandshakeHandler, Lifecycle {
 
-	private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
+	private static final boolean jettyWsPresent;
 
+	private static final boolean tomcatWsPresent;
 
-	private static final ClassLoader classLoader = AbstractHandshakeHandler.class.getClassLoader();
+	private static final boolean undertowWsPresent;
 
-	private static final boolean jettyWsPresent = ClassUtils.isPresent(
-			"org.eclipse.jetty.websocket.server.WebSocketServerFactory", classLoader);
+	private static final boolean glassfishWsPresent;
 
-	private static final boolean tomcatWsPresent = ClassUtils.isPresent(
-			"org.apache.tomcat.websocket.server.WsHttpUpgradeHandler", classLoader);
+	private static final boolean weblogicWsPresent;
 
-	private static final boolean undertowWsPresent = ClassUtils.isPresent(
-			"io.undertow.websockets.jsr.ServerWebSocketContainer", classLoader);
+	private static final boolean websphereWsPresent;
 
-	private static final boolean glassFishWsPresent = ClassUtils.isPresent(
-			"org.glassfish.tyrus.servlet.TyrusHttpUpgradeHandler", classLoader);
+	static {
+		ClassLoader classLoader = AbstractHandshakeHandler.class.getClassLoader();
+		jettyWsPresent = ClassUtils.isPresent(
+				"org.eclipse.jetty.websocket.server.WebSocketServerFactory", classLoader);
+		tomcatWsPresent = ClassUtils.isPresent(
+				"org.apache.tomcat.websocket.server.WsHttpUpgradeHandler", classLoader);
+		undertowWsPresent = ClassUtils.isPresent(
+				"io.undertow.websockets.jsr.ServerWebSocketContainer", classLoader);
+		glassfishWsPresent = ClassUtils.isPresent(
+				"org.glassfish.tyrus.servlet.TyrusHttpUpgradeHandler", classLoader);
+		weblogicWsPresent = ClassUtils.isPresent(
+				"weblogic.websocket.tyrus.TyrusServletWriter", classLoader);
+		websphereWsPresent = ClassUtils.isPresent(
+				"com.ibm.websphere.wsoc.WsWsocServerContainer", classLoader);
 
-	private static final boolean webLogicWsPresent = ClassUtils.isPresent(
-			"weblogic.websocket.tyrus.TyrusServletWriter", classLoader);
-
-	private static final boolean webSphereWsPresent = ClassUtils.isPresent(
-			"com.ibm.websphere.wsoc.WsWsocServerContainer", classLoader);
+	}
 
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private final RequestUpgradeStrategy requestUpgradeStrategy;
 
-	private final List<String> supportedProtocols = new ArrayList<String>();
+	private final List<String> supportedProtocols = new ArrayList<>();
 
-	private volatile boolean running = false;
+	private volatile boolean running;
 
 
 	/**
@@ -125,23 +140,24 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 		else if (undertowWsPresent) {
 			className = "org.springframework.web.socket.server.standard.UndertowRequestUpgradeStrategy";
 		}
-		else if (glassFishWsPresent) {
+		else if (glassfishWsPresent) {
 			className = "org.springframework.web.socket.server.standard.GlassFishRequestUpgradeStrategy";
 		}
-		else if (webLogicWsPresent) {
+		else if (weblogicWsPresent) {
 			className = "org.springframework.web.socket.server.standard.WebLogicRequestUpgradeStrategy";
 		}
-		else if (webSphereWsPresent) {
+		else if (websphereWsPresent) {
 			className = "org.springframework.web.socket.server.standard.WebSphereRequestUpgradeStrategy";
 		}
 		else {
 			throw new IllegalStateException("No suitable default RequestUpgradeStrategy found");
 		}
+
 		try {
-			Class<?> clazz = ClassUtils.forName(className, classLoader);
-			return (RequestUpgradeStrategy) clazz.newInstance();
+			Class<?> clazz = ClassUtils.forName(className, AbstractHandshakeHandler.class.getClassLoader());
+			return (RequestUpgradeStrategy) ReflectionUtils.accessibleConstructor(clazz).newInstance();
 		}
-		catch (Throwable ex) {
+		catch (Exception ex) {
 			throw new IllegalStateException(
 					"Failed to instantiate RequestUpgradeStrategy: " + className, ex);
 		}
@@ -177,13 +193,9 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 	 * Return the list of supported sub-protocols.
 	 */
 	public String[] getSupportedProtocols() {
-		return this.supportedProtocols.toArray(new String[this.supportedProtocols.size()]);
+		return StringUtils.toStringArray(this.supportedProtocols);
 	}
 
-	@Override
-	public boolean isRunning() {
-		return this.running;
-	}
 
 	@Override
 	public void start() {
@@ -213,6 +225,11 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 		}
 	}
 
+	@Override
+	public boolean isRunning() {
+		return this.running;
+	}
+
 
 	@Override
 	public final boolean doHandshake(ServerHttpRequest request, ServerHttpResponse response,
@@ -223,7 +240,7 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 			logger.trace("Processing request " + request.getURI() + " with headers=" + headers);
 		}
 		try {
-			if (!HttpMethod.GET.equals(request.getMethod())) {
+			if (HttpMethod.GET != request.getMethod()) {
 				response.setStatusCode(HttpStatus.METHOD_NOT_ALLOWED);
 				response.getHeaders().setAllow(Collections.singleton(HttpMethod.GET));
 				if (logger.isErrorEnabled()) {
@@ -258,7 +275,7 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 		}
 		catch (IOException ex) {
 			throw new HandshakeFailureException(
-					"Response update failed during upgrade to WebSocket, uri=" + request.getURI(), ex);
+					"Response update failed during upgrade to WebSocket: " + request.getURI(), ex);
 		}
 
 		String subProtocol = selectProtocol(headers.getSecWebSocketProtocol(), wsHandler);
@@ -279,7 +296,7 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 			logger.error("Handshake failed due to invalid Upgrade header: " + request.getHeaders().getUpgrade());
 		}
 		response.setStatusCode(HttpStatus.BAD_REQUEST);
-		response.getBody().write("Can \"Upgrade\" only to \"WebSocket\".".getBytes(UTF8_CHARSET));
+		response.getBody().write("Can \"Upgrade\" only to \"WebSocket\".".getBytes(StandardCharsets.UTF_8));
 	}
 
 	protected void handleInvalidConnectHeader(ServerHttpRequest request, ServerHttpResponse response) throws IOException {
@@ -287,7 +304,7 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 			logger.error("Handshake failed due to invalid Connection header " + request.getHeaders().getConnection());
 		}
 		response.setStatusCode(HttpStatus.BAD_REQUEST);
-		response.getBody().write("\"Connection\" must be \"upgrade\".".getBytes(UTF8_CHARSET));
+		response.getBody().write("\"Connection\" must be \"upgrade\".".getBytes(StandardCharsets.UTF_8));
 	}
 
 	protected boolean isWebSocketVersionSupported(WebSocketHttpHeaders httpHeaders) {
@@ -312,8 +329,8 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 					". Supported versions: " + Arrays.toString(getSupportedVersions()));
 		}
 		response.setStatusCode(HttpStatus.UPGRADE_REQUIRED);
-		response.getHeaders().put(WebSocketHttpHeaders.SEC_WEBSOCKET_VERSION,
-				Arrays.asList(StringUtils.arrayToCommaDelimitedString(getSupportedVersions())));
+		response.getHeaders().set(WebSocketHttpHeaders.SEC_WEBSOCKET_VERSION,
+				StringUtils.arrayToCommaDelimitedString(getSupportedVersions()));
 	}
 
 	/**
@@ -336,16 +353,15 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 	 * @return the selected protocols or {@code null}
 	 * @see #determineHandlerSupportedProtocols(WebSocketHandler)
 	 */
+	@Nullable
 	protected String selectProtocol(List<String> requestedProtocols, WebSocketHandler webSocketHandler) {
-		if (requestedProtocols != null) {
-			List<String> handlerProtocols = determineHandlerSupportedProtocols(webSocketHandler);
-			for (String protocol : requestedProtocols) {
-				if (handlerProtocols.contains(protocol.toLowerCase())) {
-					return protocol;
-				}
-				if (this.supportedProtocols.contains(protocol.toLowerCase())) {
-					return protocol;
-				}
+		List<String> handlerProtocols = determineHandlerSupportedProtocols(webSocketHandler);
+		for (String protocol : requestedProtocols) {
+			if (handlerProtocols.contains(protocol.toLowerCase())) {
+				return protocol;
+			}
+			if (this.supportedProtocols.contains(protocol.toLowerCase())) {
+				return protocol;
 			}
 		}
 		return null;
@@ -363,12 +379,12 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 		if (handlerToCheck instanceof SubProtocolCapable) {
 			subProtocols = ((SubProtocolCapable) handlerToCheck).getSubProtocols();
 		}
-		return (subProtocols != null ? subProtocols : Collections.<String>emptyList());
+		return (subProtocols != null ? subProtocols : Collections.emptyList());
 	}
 
 	/**
 	 * Filter the list of requested WebSocket extensions.
-	 * <p>As of 4.1 the default implementation of this method filters the list to
+	 * <p>As of 4.1, the default implementation of this method filters the list to
 	 * leave only extensions that are both requested and supported.
 	 * @param request the current request
 	 * @param requestedExtensions the list of extensions requested by the client
@@ -378,7 +394,7 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 	protected List<WebSocketExtension> filterRequestedExtensions(ServerHttpRequest request,
 			List<WebSocketExtension> requestedExtensions, List<WebSocketExtension> supportedExtensions) {
 
-		List<WebSocketExtension> result = new ArrayList<WebSocketExtension>(requestedExtensions.size());
+		List<WebSocketExtension> result = new ArrayList<>(requestedExtensions.size());
 		for (WebSocketExtension extension : requestedExtensions) {
 			if (supportedExtensions.contains(extension)) {
 				result.add(extension);
@@ -392,15 +408,15 @@ public abstract class AbstractHandshakeHandler implements HandshakeHandler, Life
 	 * in the process of being established. The default implementation calls
 	 * {@link ServerHttpRequest#getPrincipal()}
 	 * <p>Subclasses can provide custom logic for associating a user with a session,
-	 * for example for assigning a name to anonymous users (i.e. not fully
-	 * authenticated).
+	 * for example for assigning a name to anonymous users (i.e. not fully authenticated).
 	 * @param request the handshake request
 	 * @param wsHandler the WebSocket handler that will handle messages
 	 * @param attributes handshake attributes to pass to the WebSocket session
 	 * @return the user for the WebSocket session, or {@code null} if not available
 	 */
-	protected Principal determineUser(ServerHttpRequest request, WebSocketHandler wsHandler,
-			Map<String, Object> attributes) {
+	@Nullable
+	protected Principal determineUser(
+			ServerHttpRequest request, WebSocketHandler wsHandler, Map<String, Object> attributes) {
 
 		return request.getPrincipal();
 	}

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2007 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,86 +16,88 @@
 
 package org.springframework.beans.propertyeditors;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Rick Evans
  * @author Juergen Hoeller
+ * @author Sam Brannen
  */
-public class StringArrayPropertyEditorTests extends TestCase {
+class StringArrayPropertyEditorTests {
 
-	public void testWithDefaultSeparator() throws Exception {
+	@Test
+	void withDefaultSeparator() {
 		StringArrayPropertyEditor editor = new StringArrayPropertyEditor();
 		editor.setAsText("0,1,2");
 		Object value = editor.getValue();
-		assertNotNull(value);
-		assertTrue(value instanceof String[]);
-		String[] array = (String[]) value;
-		for (int i = 0; i < array.length; ++i) {
-			assertEquals("" + i, array[i]);
-		}
-		assertEquals("0,1,2", editor.getAsText());
+		assertTrimmedElements(value);
+		assertThat(editor.getAsText()).isEqualTo("0,1,2");
 	}
 
-	public void testTrimByDefault() throws Exception {
+	@Test
+	void trimByDefault() {
 		StringArrayPropertyEditor editor = new StringArrayPropertyEditor();
 		editor.setAsText(" 0,1 , 2 ");
 		Object value = editor.getValue();
-		String[] array = (String[]) value;
-		for (int i = 0; i < array.length; ++i) {
-			assertEquals("" + i, array[i]);
-		}
-		assertEquals("0,1,2", editor.getAsText());
+		assertTrimmedElements(value);
+		assertThat(editor.getAsText()).isEqualTo("0,1,2");
 	}
 
-	public void testNoTrim() throws Exception {
-		StringArrayPropertyEditor editor = new StringArrayPropertyEditor(",",false,false);
+	@Test
+	void noTrim() {
+		StringArrayPropertyEditor editor = new StringArrayPropertyEditor(",", false, false);
 		editor.setAsText("  0,1  , 2 ");
 		Object value = editor.getValue();
 		String[] array = (String[]) value;
 		for (int i = 0; i < array.length; ++i) {
-			assertEquals(3, array[i].length());
-			assertEquals("" + i, array[i].trim());
+			assertThat(array[i].length()).isEqualTo(3);
+			assertThat(array[i].trim()).isEqualTo(("" + i));
 		}
-		assertEquals("  0,1  , 2 ", editor.getAsText());
+		assertThat(editor.getAsText()).isEqualTo("  0,1  , 2 ");
 	}
 
-	public void testWithCustomSeparator() throws Exception {
+	@Test
+	void withCustomSeparator() {
 		StringArrayPropertyEditor editor = new StringArrayPropertyEditor(":");
 		editor.setAsText("0:1:2");
 		Object value = editor.getValue();
-		assertTrue(value instanceof String[]);
-		String[] array = (String[]) value;
-		for (int i = 0; i < array.length; ++i) {
-			assertEquals("" + i, array[i]);
-		}
-		assertEquals("0:1:2", editor.getAsText());
+		assertTrimmedElements(value);
+		assertThat(editor.getAsText()).isEqualTo("0:1:2");
 	}
 
-	public void testWithCharsToDelete() throws Exception {
+	@Test
+	void withCharsToDelete() {
 		StringArrayPropertyEditor editor = new StringArrayPropertyEditor(",", "\r\n", false);
 		editor.setAsText("0\r,1,\n2");
 		Object value = editor.getValue();
-		assertTrue(value instanceof String[]);
-		String[] array = (String[]) value;
-		for (int i = 0; i < array.length; ++i) {
-			assertEquals("" + i, array[i]);
-		}
-		assertEquals("0,1,2", editor.getAsText());
+		assertTrimmedElements(value);
+		assertThat(editor.getAsText()).isEqualTo("0,1,2");
 	}
 
-	public void testWithEmptyArray() throws Exception {
+	@Test
+	void withEmptyArray() {
 		StringArrayPropertyEditor editor = new StringArrayPropertyEditor();
 		editor.setAsText("");
 		Object value = editor.getValue();
-		assertTrue(value instanceof String[]);
-		assertEquals(0, ((String[]) value).length);
+		assertThat(value).isInstanceOf(String[].class);
+		assertThat((String[]) value).isEmpty();
 	}
 
-	public void testWithEmptyArrayAsNull() throws Exception {
+	@Test
+	void withEmptyArrayAsNull() {
 		StringArrayPropertyEditor editor = new StringArrayPropertyEditor(",", true);
 		editor.setAsText("");
-		assertNull(editor.getValue());
+		assertThat(editor.getValue()).isNull();
+	}
+
+	private static void assertTrimmedElements(Object value) {
+		assertThat(value).isInstanceOf(String[].class);
+		String[] array = (String[]) value;
+		for (int i = 0; i < array.length; ++i) {
+			assertThat(array[i]).isEqualTo(("" + i));
+		}
 	}
 
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2012 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,21 +19,24 @@ package org.springframework.core;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Rod Johnson
  * @author Juergen Hoeller
  */
-public class NestedExceptionTests extends TestCase {
+@SuppressWarnings("serial")
+class NestedExceptionTests {
 
-	@SuppressWarnings("serial")
-	public void testNestedRuntimeExceptionWithNoRootCause() {
+	@Test
+	void nestedRuntimeExceptionWithNoRootCause() {
 		String mesg = "mesg of mine";
 		// Making a class abstract doesn't _really_ prevent instantiation :-)
 		NestedRuntimeException nex = new NestedRuntimeException(mesg) {};
-		assertNull(nex.getCause());
-		assertEquals(nex.getMessage(), mesg);
+		assertThat(nex.getCause()).isNull();
+		assertThat(mesg).isEqualTo(nex.getMessage());
 
 		// Check printStackTrace
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -41,19 +44,19 @@ public class NestedExceptionTests extends TestCase {
 		nex.printStackTrace(pw);
 		pw.flush();
 		String stackTrace = new String(baos.toByteArray());
-		assertFalse(stackTrace.indexOf(mesg) == -1);
+		assertThat(stackTrace.contains(mesg)).isTrue();
 	}
 
-	@SuppressWarnings("serial")
-	public void testNestedRuntimeExceptionWithRootCause() {
+	@Test
+	void nestedRuntimeExceptionWithRootCause() {
 		String myMessage = "mesg for this exception";
-		String rootCauseMesg = "this is the obscure message of the root cause";
-		Exception rootCause = new Exception(rootCauseMesg);
+		String rootCauseMsg = "this is the obscure message of the root cause";
+		Exception rootCause = new Exception(rootCauseMsg);
 		// Making a class abstract doesn't _really_ prevent instantiation :-)
 		NestedRuntimeException nex = new NestedRuntimeException(myMessage, rootCause) {};
-		assertEquals(nex.getCause(), rootCause);
-		assertTrue(nex.getMessage().indexOf(myMessage) != -1);
-		assertTrue(nex.getMessage().indexOf(rootCauseMesg) != -1);
+		assertThat(rootCause).isEqualTo(nex.getCause());
+		assertThat(nex.getMessage().contains(myMessage)).isTrue();
+		assertThat(nex.getMessage().endsWith(rootCauseMsg)).isTrue();
 
 		// check PrintStackTrace
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -61,17 +64,17 @@ public class NestedExceptionTests extends TestCase {
 		nex.printStackTrace(pw);
 		pw.flush();
 		String stackTrace = new String(baos.toByteArray());
-		assertFalse(stackTrace.indexOf(rootCause.getClass().getName()) == -1);
-		assertFalse(stackTrace.indexOf(rootCauseMesg) == -1);
+		assertThat(stackTrace.contains(rootCause.getClass().getName())).isTrue();
+		assertThat(stackTrace.contains(rootCauseMsg)).isTrue();
 	}
 
-	@SuppressWarnings("serial")
-	public void testNestedCheckedExceptionWithNoRootCause() {
+	@Test
+	void nestedCheckedExceptionWithNoRootCause() {
 		String mesg = "mesg of mine";
 		// Making a class abstract doesn't _really_ prevent instantiation :-)
 		NestedCheckedException nex = new NestedCheckedException(mesg) {};
-		assertNull(nex.getCause());
-		assertEquals(nex.getMessage(), mesg);
+		assertThat(nex.getCause()).isNull();
+		assertThat(mesg).isEqualTo(nex.getMessage());
 
 		// Check printStackTrace
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -79,19 +82,19 @@ public class NestedExceptionTests extends TestCase {
 		nex.printStackTrace(pw);
 		pw.flush();
 		String stackTrace = new String(baos.toByteArray());
-		assertFalse(stackTrace.indexOf(mesg) == -1);
+		assertThat(stackTrace.contains(mesg)).isTrue();
 	}
 
-	@SuppressWarnings("serial")
-	public void testNestedCheckedExceptionWithRootCause() {
+	@Test
+	void nestedCheckedExceptionWithRootCause() {
 		String myMessage = "mesg for this exception";
-		String rootCauseMesg = "this is the obscure message of the root cause";
-		Exception rootCause = new Exception(rootCauseMesg);
+		String rootCauseMsg = "this is the obscure message of the root cause";
+		Exception rootCause = new Exception(rootCauseMsg);
 		// Making a class abstract doesn't _really_ prevent instantiation :-)
 		NestedCheckedException nex = new NestedCheckedException(myMessage, rootCause) {};
-		assertEquals(nex.getCause(), rootCause);
-		assertTrue(nex.getMessage().indexOf(myMessage) != -1);
-		assertTrue(nex.getMessage().indexOf(rootCauseMesg) != -1);
+		assertThat(rootCause).isEqualTo(nex.getCause());
+		assertThat(nex.getMessage().contains(myMessage)).isTrue();
+		assertThat(nex.getMessage().endsWith(rootCauseMsg)).isTrue();
 
 		// check PrintStackTrace
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -99,8 +102,8 @@ public class NestedExceptionTests extends TestCase {
 		nex.printStackTrace(pw);
 		pw.flush();
 		String stackTrace = new String(baos.toByteArray());
-		assertFalse(stackTrace.indexOf(rootCause.getClass().getName()) == -1);
-		assertFalse(stackTrace.indexOf(rootCauseMesg) == -1);
+		assertThat(stackTrace.contains(rootCause.getClass().getName())).isTrue();
+		assertThat(stackTrace.contains(rootCauseMsg)).isTrue();
 	}
 
 }

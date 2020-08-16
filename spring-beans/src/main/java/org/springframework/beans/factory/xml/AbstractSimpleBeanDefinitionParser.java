@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -90,7 +90,7 @@ import org.springframework.util.StringUtils;
  * <pre class="code">&lt;util:properties location="jdbc.properties"/&gt;</pre>
  *
  * <p>The observant reader will notice that the sole attribute on the
- * {@code &lt;util:properties/&gt;} element matches the
+ * {@code <util:properties/>} element matches the
  * {@link org.springframework.beans.factory.config.PropertiesFactoryBean#setLocation(org.springframework.core.io.Resource)}
  * method name on the {@code PropertiesFactoryBean} (the general
  * usage thus illustrated holds true for any number of attributes).

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2006 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,37 +18,39 @@ package org.springframework.beans.propertyeditors;
 
 import java.beans.PropertyEditor;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Unit tests for the {@link CharArrayPropertyEditor} class.
  *
  * @author Rick Evans
  */
-public final class CharArrayPropertyEditorTests extends TestCase {
+public class CharArrayPropertyEditorTests {
 
-	public void testSunnyDaySetAsText() throws Exception {
+	private final PropertyEditor charEditor = new CharArrayPropertyEditor();
+
+	@Test
+	public void sunnyDaySetAsText() throws Exception {
 		final String text = "Hideous towns make me throw... up";
-
-		PropertyEditor charEditor = new CharArrayPropertyEditor();
 		charEditor.setAsText(text);
 
 		Object value = charEditor.getValue();
-		assertNotNull(value);
-		assertTrue(value instanceof char[]);
+		assertThat(value).isNotNull().isInstanceOf(char[].class);
 		char[] chars = (char[]) value;
 		for (int i = 0; i < text.length(); ++i) {
-			assertEquals("char[] differs at index '" + i + "'", text.charAt(i), chars[i]);
+			assertThat(chars[i]).as("char[] differs at index '" + i + "'").isEqualTo(text.charAt(i));
 		}
-		assertEquals(text, charEditor.getAsText());
+		assertThat(charEditor.getAsText()).isEqualTo(text);
 	}
 
-	public void testGetAsTextReturnsEmptyStringIfValueIsNull() throws Exception {
-		PropertyEditor charEditor = new CharArrayPropertyEditor();
-		assertEquals("", charEditor.getAsText());
+	@Test
+	public void getAsTextReturnsEmptyStringIfValueIsNull() throws Exception {
+		assertThat(charEditor.getAsText()).isEqualTo("");
 
 		charEditor.setAsText(null);
-		assertEquals("", charEditor.getAsText());
+		assertThat(charEditor.getAsText()).isEqualTo("");
 	}
 
 }

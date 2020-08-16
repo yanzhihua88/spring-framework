@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,8 +29,8 @@ import org.springframework.beans.factory.xml.NamespaceHandlerSupport;
  * to declaratively manage transactions.
  *
  * <p>One approach uses transaction semantics defined in XML using the
- * {@code &lt;tx:advice&gt;} elements, the other uses annotations
- * in combination with the {@code &lt;tx:annotation-driven&gt;} element.
+ * {@code <tx:advice>} elements, the other uses annotations
+ * in combination with the {@code <tx:annotation-driven>} element.
  * Both approached are detailed to great extent in the Spring reference manual.
  *
  * @author Rob Harrop

@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2013 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,94 +20,98 @@ import javax.servlet.FilterChain;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
-import org.springframework.mock.web.test.MockFilterConfig;
-import org.springframework.mock.web.test.MockHttpServletResponse;
-import org.springframework.mock.web.test.MockServletContext;
+import org.springframework.web.testfixture.servlet.MockFilterConfig;
+import org.springframework.web.testfixture.servlet.MockHttpServletResponse;
+import org.springframework.web.testfixture.servlet.MockServletContext;
 import org.springframework.web.util.WebUtils;
 
-import static org.mockito.BDDMockito.*;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * @author Rick Evans
  * @author Juergen Hoeller
+ * @author Vedran Pavic
  */
-public class CharacterEncodingFilterTests extends TestCase {
+public class CharacterEncodingFilterTests {
 
 	private static final String FILTER_NAME = "boot";
 
 	private static final String ENCODING = "UTF-8";
 
 
-	public void testForceAlwaysSetsEncoding() throws Exception {
+	@Test
+	public void forceEncodingAlwaysSetsEncoding() throws Exception {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		request.setCharacterEncoding(ENCODING);
 		given(request.getAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE)).willReturn(null);
-		given(request.getAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX)).willReturn(null);
+		given(request.getAttribute(filteredName(FILTER_NAME))).willReturn(null);
 
 		HttpServletResponse response = mock(HttpServletResponse.class);
 		FilterChain filterChain = mock(FilterChain.class);
 
-		CharacterEncodingFilter filter = new CharacterEncodingFilter();
-		filter.setForceEncoding(true);
-		filter.setEncoding(ENCODING);
+		CharacterEncodingFilter filter = new CharacterEncodingFilter(ENCODING, true);
 		filter.init(new MockFilterConfig(FILTER_NAME));
 		filter.doFilter(request, response, filterChain);
 
-		verify(request).setAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX, Boolean.TRUE);
-		verify(request).removeAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX);
+		verify(request).setAttribute(filteredName(FILTER_NAME), Boolean.TRUE);
+		verify(request).removeAttribute(filteredName(FILTER_NAME));
 		verify(response).setCharacterEncoding(ENCODING);
 		verify(filterChain).doFilter(request, response);
 	}
 
-	public void testEncodingIfEmptyAndNotForced() throws Exception {
+	@Test
+	public void encodingIfEmptyAndNotForced() throws Exception {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		given(request.getCharacterEncoding()).willReturn(null);
 		given(request.getAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE)).willReturn(null);
-		given(request.getAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX)).willReturn(null);
+		given(request.getAttribute(filteredName(FILTER_NAME))).willReturn(null);
 
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
 		FilterChain filterChain = mock(FilterChain.class);
 
-		CharacterEncodingFilter filter = new CharacterEncodingFilter();
-		filter.setForceEncoding(false);
-		filter.setEncoding(ENCODING);
+		CharacterEncodingFilter filter = new CharacterEncodingFilter(ENCODING);
 		filter.init(new MockFilterConfig(FILTER_NAME));
 		filter.doFilter(request, response, filterChain);
 
 		verify(request).setCharacterEncoding(ENCODING);
-		verify(request).setAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX, Boolean.TRUE);
-		verify(request).removeAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX);
+		verify(request).setAttribute(filteredName(FILTER_NAME), Boolean.TRUE);
+		verify(request).removeAttribute(filteredName(FILTER_NAME));
 		verify(filterChain).doFilter(request, response);
 	}
 
-	public void testDoesNowtIfEncodingIsNotEmptyAndNotForced() throws Exception {
+	@Test
+	public void doesNotIfEncodingIsNotEmptyAndNotForced() throws Exception {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		given(request.getCharacterEncoding()).willReturn(ENCODING);
 		given(request.getAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE)).willReturn(null);
-		given(request.getAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX)).willReturn(null);
+		given(request.getAttribute(filteredName(FILTER_NAME))).willReturn(null);
 
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
 		FilterChain filterChain = mock(FilterChain.class);
 
-		CharacterEncodingFilter filter = new CharacterEncodingFilter();
-		filter.setEncoding(ENCODING);
+		CharacterEncodingFilter filter = new CharacterEncodingFilter(ENCODING);
 		filter.init(new MockFilterConfig(FILTER_NAME));
 		filter.doFilter(request, response, filterChain);
 
-		verify(request).setAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX, Boolean.TRUE);
-		verify(request).removeAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX);
+		verify(request).setAttribute(filteredName(FILTER_NAME), Boolean.TRUE);
+		verify(request).removeAttribute(filteredName(FILTER_NAME));
 		verify(filterChain).doFilter(request, response);
 	}
 
-	public void testWithBeanInitialization() throws Exception {
+	@Test
+	public void withBeanInitialization() throws Exception {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		given(request.getCharacterEncoding()).willReturn(null);
 		given(request.getAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE)).willReturn(null);
-		given(request.getAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX)).willReturn(null);
+		given(request.getAttribute(filteredName(FILTER_NAME))).willReturn(null);
 
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -120,28 +124,55 @@ public class CharacterEncodingFilterTests extends TestCase {
 		filter.doFilter(request, response, filterChain);
 
 		verify(request).setCharacterEncoding(ENCODING);
-		verify(request).setAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX, Boolean.TRUE);
-		verify(request).removeAttribute(FILTER_NAME + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX);
+		verify(request).setAttribute(filteredName(FILTER_NAME), Boolean.TRUE);
+		verify(request).removeAttribute(filteredName(FILTER_NAME));
 		verify(filterChain).doFilter(request, response);
 	}
 
-	public void testWithIncompleteInitialization() throws Exception {
+	@Test
+	public void withIncompleteInitialization() throws Exception {
 		HttpServletRequest request = mock(HttpServletRequest.class);
 		given(request.getCharacterEncoding()).willReturn(null);
 		given(request.getAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE)).willReturn(null);
-		given(request.getAttribute(CharacterEncodingFilter.class.getName() + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX)).willReturn(null);
+		given(request.getAttribute(filteredName(CharacterEncodingFilter.class.getName()))).willReturn(null);
 
 		MockHttpServletResponse response = new MockHttpServletResponse();
 
 		FilterChain filterChain = mock(FilterChain.class);
 
-		CharacterEncodingFilter filter = new CharacterEncodingFilter();
-		filter.setEncoding(ENCODING);
+		CharacterEncodingFilter filter = new CharacterEncodingFilter(ENCODING);
 		filter.doFilter(request, response, filterChain);
 
 		verify(request).setCharacterEncoding(ENCODING);
-		verify(request).setAttribute(CharacterEncodingFilter.class.getName() + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX, Boolean.TRUE);
-		verify(request).removeAttribute(CharacterEncodingFilter.class.getName() + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX);
+		verify(request).setAttribute(filteredName(CharacterEncodingFilter.class.getName()), Boolean.TRUE);
+		verify(request).removeAttribute(filteredName(CharacterEncodingFilter.class.getName()));
 		verify(filterChain).doFilter(request, response);
 	}
+
+	// SPR-14240
+	@Test
+	public void setForceEncodingOnRequestOnly() throws Exception {
+		HttpServletRequest request = mock(HttpServletRequest.class);
+		request.setCharacterEncoding(ENCODING);
+		given(request.getAttribute(WebUtils.ERROR_REQUEST_URI_ATTRIBUTE)).willReturn(null);
+		given(request.getAttribute(filteredName(FILTER_NAME))).willReturn(null);
+
+		HttpServletResponse response = mock(HttpServletResponse.class);
+		FilterChain filterChain = mock(FilterChain.class);
+
+		CharacterEncodingFilter filter = new CharacterEncodingFilter(ENCODING, true, false);
+		filter.init(new MockFilterConfig(FILTER_NAME));
+		filter.doFilter(request, response, filterChain);
+
+		verify(request).setAttribute(filteredName(FILTER_NAME), Boolean.TRUE);
+		verify(request).removeAttribute(filteredName(FILTER_NAME));
+		verify(request, times(2)).setCharacterEncoding(ENCODING);
+		verify(response, never()).setCharacterEncoding(ENCODING);
+		verify(filterChain).doFilter(request, response);
+	}
+
+	private String filteredName(String prefix) {
+		return prefix + OncePerRequestFilter.ALREADY_FILTERED_SUFFIX;
+	}
+
 }

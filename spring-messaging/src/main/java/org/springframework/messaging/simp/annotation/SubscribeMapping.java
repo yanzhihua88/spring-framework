@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,6 +39,11 @@ import java.lang.annotation.Target;
  * {@link SendToUser}, the message is sent directly back to the connected
  * user and does not pass through the message broker. This is useful for
  * implementing a request-reply pattern.
+ *
+ * <p><b>NOTE:</b> When using controller interfaces (e.g. for AOP proxying),
+ * make sure to consistently put <i>all</i> your mapping annotations - such as
+ * {@code @MessageMapping} and {@code @SubscribeMapping} - on
+ * the controller <i>interface</i> rather than on the implementation class.
  *
  * @author Rossen Stoyanchev
  * @since 4.0

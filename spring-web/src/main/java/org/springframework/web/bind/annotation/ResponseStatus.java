@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,24 +30,29 @@ import org.springframework.http.HttpStatus;
  * {@link #reason} that should be returned.
  *
  * <p>The status code is applied to the HTTP response when the handler
- * method is invoked.
+ * method is invoked and overrides status information set by other means,
+ * like {@code ResponseEntity} or {@code "redirect:"}.
  *
- * <p><strong>Note:</strong> when using this annotation on an exception class,
- * or when setting the {@code reason} attribute of the annotation,
+ * <p><strong>Warning</strong>: when using this annotation on an exception
+ * class, or when setting the {@code reason} attribute of this annotation,
  * the {@code HttpServletResponse.sendError} method will be used.
  *
- * With {@code HttpServletResponse.sendError}, the response is considered
- * complete and should not be written to any further.
- * Furthermore servlet container will typically write an HTML error page
- * therefore making the use of a reason unsuitable for REST APIs.
- * For such cases prefer the use of {@link org.springframework.http.ResponseEntity}
- * as a return type and avoid {@code ResponseStatus} altogether.
+ * <p>With {@code HttpServletResponse.sendError}, the response is considered
+ * complete and should not be written to any further. Furthermore, the Servlet
+ * container will typically write an HTML error page therefore making the
+ * use of a {@code reason} unsuitable for REST APIs. For such cases it is
+ * preferable to use a {@link org.springframework.http.ResponseEntity} as
+ * a return type and avoid the use of {@code @ResponseStatus} altogether.
+ *
+ * <p>Note that a controller class may also be annotated with
+ * {@code @ResponseStatus} and is then inherited by all {@code @RequestMapping}
+ * methods.
  *
  * @author Arjen Poutsma
  * @author Sam Brannen
+ * @since 3.0
  * @see org.springframework.web.servlet.mvc.annotation.ResponseStatusExceptionResolver
  * @see javax.servlet.http.HttpServletResponse#sendError(int, String)
- * @since 3.0
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

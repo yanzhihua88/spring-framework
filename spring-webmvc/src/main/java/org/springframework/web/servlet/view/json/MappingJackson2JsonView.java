@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2015 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,14 +17,10 @@
 package org.springframework.web.servlet.view.json;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -32,15 +28,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
-import org.springframework.http.converter.json.MappingJacksonValue;
+import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.View;
 
 /**
  * Spring MVC {@link View} that renders JSON content by serializing the model for the current request
- * using <a href="http://wiki.fasterxml.com/JacksonHome">Jackson 2's</a> {@link ObjectMapper}.
+ * using <a href="https://github.com/FasterXML/jackson">Jackson 2's</a> {@link ObjectMapper}.
  *
  * <p>By default, the entire contents of the model map (with the exception of framework-specific classes)
  * will be encoded as JSON. If the model contains only one key, you can have it extracted encoded as JSON
@@ -48,7 +43,7 @@ import org.springframework.web.servlet.View;
  *
  * <p>The default constructor uses the default configuration provided by {@link Jackson2ObjectMapperBuilder}.
  *
- * <p>Compatible with Jackson 2.1 and higher.
+ * <p>Compatible with Jackson 2.6 and higher, as of Spring 4.3.
  *
  * @author Jeremy Grelle
  * @author Arjen Poutsma
@@ -65,18 +60,13 @@ public class MappingJackson2JsonView extends AbstractJackson2View {
 	 */
 	public static final String DEFAULT_CONTENT_TYPE = "application/json";
 
-	/**
-	 * Default content type for JSONP: "application/javascript".
-	 */
-	public static final String DEFAULT_JSONP_CONTENT_TYPE = "application/javascript";
-
+	@Nullable
 	private String jsonPrefix;
 
+	@Nullable
 	private Set<String> modelKeys;
 
 	private boolean extractValueFromSingleKeyModel = false;
-
-	private Set<String> jsonpParameterNames = new LinkedHashSet<String>(Arrays.asList("jsonp", "callback"));
 
 
 	/**
@@ -86,6 +76,15 @@ public class MappingJackson2JsonView extends AbstractJackson2View {
 	 */
 	public MappingJackson2JsonView() {
 		super(Jackson2ObjectMapperBuilder.json().build(), DEFAULT_CONTENT_TYPE);
+	}
+
+	/**
+	 * Construct a new {@code MappingJackson2JsonView} using the provided
+	 * {@link ObjectMapper} and setting the content type to {@code application/json}.
+	 * @since 4.2.1
+	 */
+	public MappingJackson2JsonView(ObjectMapper objectMapper) {
+		super(objectMapper, DEFAULT_CONTENT_TYPE);
 	}
 
 
@@ -122,22 +121,24 @@ public class MappingJackson2JsonView extends AbstractJackson2View {
 	 * Set the attributes in the model that should be rendered by this view.
 	 * When set, all other model attributes will be ignored.
 	 */
-	public void setModelKeys(Set<String> modelKeys) {
+	public void setModelKeys(@Nullable Set<String> modelKeys) {
 		this.modelKeys = modelKeys;
 	}
 
 	/**
 	 * Return the attributes in the model that should be rendered by this view.
 	 */
+	@Nullable
 	public final Set<String> getModelKeys() {
 		return this.modelKeys;
 	}
 
 	/**
-	 * Set whether to serialize models containing a single attribute as a map or whether to
-	 * extract the single value from the model and serialize it directly.
-	 * <p>The effect of setting this flag is similar to using {@code MappingJackson2HttpMessageConverter}
-	 * with an {@code @ResponseBody} request-handling method.
+	 * Set whether to serialize models containing a single attribute as a map or
+	 * whether to extract the single value from the model and serialize it directly.
+	 * <p>The effect of setting this flag is similar to using
+	 * {@code MappingJackson2HttpMessageConverter} with an {@code @ResponseBody}
+	 * request-handling method.
 	 * <p>Default is {@code false}.
 	 */
 	public void setExtractValueFromSingleKeyModel(boolean extractValueFromSingleKeyModel) {
@@ -145,100 +146,31 @@ public class MappingJackson2JsonView extends AbstractJackson2View {
 	}
 
 	/**
-	 * Set JSONP request parameter names. Each time a request has one of those
-	 * parameters, the resulting JSON will be wrapped into a function named as
-	 * specified by the JSONP request parameter value.
-	 * <p>The parameter names configured by default are "jsonp" and "callback".
-	 * @since 4.1
-	 * @see <a href="http://en.wikipedia.org/wiki/JSONP">JSONP Wikipedia article</a>
-	 */
-	public void setJsonpParameterNames(Set<String> jsonpParameterNames) {
-		this.jsonpParameterNames = jsonpParameterNames;
-	}
-
-	private String getJsonpParameterValue(HttpServletRequest request) {
-		if (this.jsonpParameterNames != null) {
-			for (String name : this.jsonpParameterNames) {
-				String value = request.getParameter(name);
-				if (!StringUtils.isEmpty(value)) {
-					return value;
-				}
-			}
-		}
-		return null;
-	}
-
-	/**
 	 * Filter out undesired attributes from the given model.
 	 * The return value can be either another {@link Map} or a single value object.
 	 * <p>The default implementation removes {@link BindingResult} instances and entries
-	 * not included in the {@link #setRenderedAttributes renderedAttributes} property.
+	 * not included in the {@link #setModelKeys modelKeys} property.
 	 * @param model the model, as passed on to {@link #renderMergedOutputModel}
 	 * @return the value to be rendered
 	 */
 	@Override
 	protected Object filterModel(Map<String, Object> model) {
-		Map<String, Object> result = new HashMap<String, Object>(model.size());
+		Map<String, Object> result = new HashMap<>(model.size());
 		Set<String> modelKeys = (!CollectionUtils.isEmpty(this.modelKeys) ? this.modelKeys : model.keySet());
-		for (Map.Entry<String, Object> entry : model.entrySet()) {
-			if (!(entry.getValue() instanceof BindingResult) && modelKeys.contains(entry.getKey()) &&
-					!entry.getKey().equals(JsonView.class.getName()) &&
-					!entry.getKey().equals(FilterProvider.class.getName())) {
-				result.put(entry.getKey(), entry.getValue());
+		model.forEach((clazz, value) -> {
+			if (!(value instanceof BindingResult) && modelKeys.contains(clazz) &&
+					!clazz.equals(JsonView.class.getName()) &&
+					!clazz.equals(FilterProvider.class.getName())) {
+				result.put(clazz, value);
 			}
-		}
+		});
 		return (this.extractValueFromSingleKeyModel && result.size() == 1 ? result.values().iterator().next() : result);
-	}
-
-	@Override
-	protected Object filterAndWrapModel(Map<String, Object> model, HttpServletRequest request) {
-		Object value = super.filterAndWrapModel(model, request);
-		String jsonpParameterValue = getJsonpParameterValue(request);
-		if (jsonpParameterValue != null) {
-			if (value instanceof MappingJacksonValue) {
-				((MappingJacksonValue) value).setJsonpFunction(jsonpParameterValue);
-			}
-			else {
-				MappingJacksonValue container = new MappingJacksonValue(value);
-				container.setJsonpFunction(jsonpParameterValue);
-				value = container;
-			}
-		}
-		return value;
 	}
 
 	@Override
 	protected void writePrefix(JsonGenerator generator, Object object) throws IOException {
 		if (this.jsonPrefix != null) {
 			generator.writeRaw(this.jsonPrefix);
-		}
-		String jsonpFunction = null;
-		if (object instanceof MappingJacksonValue) {
-			jsonpFunction = ((MappingJacksonValue)object).getJsonpFunction();
-		}
-		if (jsonpFunction != null) {
-			generator.writeRaw(jsonpFunction + "(" );
-		}
-	}
-
-	@Override
-	protected void writeSuffix(JsonGenerator generator, Object object) throws IOException {
-		String jsonpFunction = null;
-		if (object instanceof MappingJacksonValue) {
-			jsonpFunction = ((MappingJacksonValue)object).getJsonpFunction();
-		}
-		if (jsonpFunction != null) {
-			generator.writeRaw(");");
-		}
-	}
-
-	@Override
-	protected void setResponseContentType(HttpServletRequest request, HttpServletResponse response) {
-		if (getJsonpParameterValue(request) != null) {
-			response.setContentType(DEFAULT_JSONP_CONTENT_TYPE);
-		}
-		else {
-			super.setResponseContentType(request, response);
 		}
 	}
 
